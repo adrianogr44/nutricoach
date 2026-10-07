@@ -63,8 +63,8 @@ class _HomeShellState extends State<HomeShell> {
           ),
         ),
         bottomNavigationBar: isDesktop ? null : _BottomNav(currentIndex: _index, onTap: (i) => setState(() => _index = i)),
-        floatingActionButton: _FabAdd(onTap: () => _onAdd(context, state)),
-        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: isDesktop ? null : _FabAdd(onTap: () => _onAdd(context, state)),
+        floatingActionButtonLocation: FloatingActionButtonLocation.endFloat,
       );
     });
   }
@@ -73,6 +73,7 @@ class _HomeShellState extends State<HomeShell> {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppTheme.surface,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl))),
       builder: (ctx) => _AddSheet(state: state),
     );
@@ -277,28 +278,30 @@ class _AddSheet extends StatelessWidget {
       (Icons.straighten_outlined, 'Medidas', AppTheme.textMuted, () => _navigate(context, '/measurements')),
     ];
     return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(width: 36, height: 4, decoration: BoxDecoration(color: AppTheme.borderStrong, borderRadius: BorderRadius.circular(4))),
-            const SizedBox(height: 16),
-            const Align(alignment: Alignment.centerLeft, child: Text('Registrar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, letterSpacing: -0.3))),
-            const SizedBox(height: 12),
-            for (final (icon, label, color, onTap) in items)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: ListTile(
-                  leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color, size: 20)),
-                  title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                  trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
-                  onTap: onTap,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      child: SingleChildScrollView(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(width: 36, height: 4, decoration: BoxDecoration(color: AppTheme.borderStrong, borderRadius: BorderRadius.circular(4))),
+              const SizedBox(height: 16),
+              const Align(alignment: Alignment.centerLeft, child: Text('Registrar', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, letterSpacing: -0.3))),
+              const SizedBox(height: 12),
+              for (final (icon, label, color, onTap) in items)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 4),
+                  child: ListTile(
+                    leading: Container(width: 40, height: 40, decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: Icon(icon, color: color, size: 20)),
+                    title: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                    trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted),
+                    onTap: onTap,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  ),
                 ),
-              ),
-          ],
+            ],
+          ),
         ),
       ),
     );

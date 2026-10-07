@@ -31,7 +31,7 @@ class CoachScreen extends StatelessWidget {
         title: const Text('Coach', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
         children: [
           _Greeting(name: profile?.name, primary: primary, today: today),
           const SizedBox(height: 10),
@@ -39,7 +39,9 @@ class CoachScreen extends StatelessWidget {
             children: [
               Icon(Icons.verified_outlined, size: 14, color: AppTheme.success),
               SizedBox(width: 6),
-              Text('Insights locais — sem IA generativa', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+              Expanded(
+                child: Text('Insights locais — sem IA generativa', maxLines: 1, overflow: TextOverflow.ellipsis, style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
+              ),
             ],
           ),
           const SizedBox(height: 20),

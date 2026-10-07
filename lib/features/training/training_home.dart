@@ -31,7 +31,7 @@ class TrainingHomeScreen extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
         children: [
           _HeaderGreeting(),
           const SizedBox(height: 20),

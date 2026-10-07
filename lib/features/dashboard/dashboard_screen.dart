@@ -34,7 +34,7 @@ class DashboardScreen extends StatelessWidget {
         color: AppTheme.primary,
         onRefresh: () async {},
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
           children: [
             _Greeting(name: profile?.name),
             const SizedBox(height: 24),

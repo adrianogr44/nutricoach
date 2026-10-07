@@ -56,7 +56,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ],
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
         children: [
           _MonthHeader(
             month: _month,
