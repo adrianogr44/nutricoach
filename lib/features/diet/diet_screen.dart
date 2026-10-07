@@ -1,8 +1,13 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models/diet.dart';
+import '../../services/diet_transfer.dart';
 import '../../state/app_state.dart';
 import '../../widgets/core_widgets.dart';
 
@@ -30,15 +35,21 @@ class DietScreen extends StatelessWidget {
                 IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => _renameDiet(context, diet)),
                 PopupMenuButton<String>(
                   onSelected: (v) {
+                    if (v == 'export') _exportDiet(context, diet);
+                    if (v == 'import') _importDiet(context);
                     if (v == 'delete') _confirmDeleteDiet(context, diet);
                   },
                   itemBuilder: (_) => const [
-                    PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, color: AppTheme.danger, size: 18), SizedBox(width: 8), Text('Apagar dieta')])),
+                    PopupMenuItem(value: 'export', child: Row(children: [Icon(Icons.ios_share_outlined, size: 18), SizedBox(width: 10), Text('Exportar dieta')])),
+                    PopupMenuItem(value: 'import', child: Row(children: [Icon(Icons.download_outlined, size: 18), SizedBox(width: 10), Text('Importar dieta')])),
+                    PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, color: AppTheme.danger, size: 18), SizedBox(width: 10), Text('Apagar dieta')])),
                   ],
                 ),
               ],
       ),
-      body: diet == null ? _EmptyDiet(onCreate: () => _createDiet(context)) : _DietDailyList(diet: diet),
+      body: diet == null
+          ? _EmptyDiet(onCreate: () => _createDiet(context), onImport: () => _importDiet(context))
+          : _DietDailyList(diet: diet),
     );
   }
 
@@ -91,6 +102,183 @@ class DietScreen extends StatelessWidget {
       final state = context.read<AppState>();
       await state.deleteDiet(diet.id);
     }
+  }
+
+  void _snack(BuildContext context, String message) {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Dialog de exportação: copia o JSON para a área de transferência ou
+  /// salva em arquivo — os dois caminhos funcionam offline.
+  Future<void> _exportDiet(BuildContext context, DietPlan diet) async {
+    final json = DietTransfer.export(diet);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: const Text('Exportar dieta'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('${diet.name} · ${diet.meals.length} refeições',
+                  style: const TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w700)),
+              const SizedBox(height: 6),
+              const Text(
+                'Copie o JSON ou salve o arquivo e importe em outro navegador/dispositivo. Funciona sem internet.',
+                style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 200),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(json,
+                      style: const TextStyle(
+                          color: AppTheme.textMuted, fontSize: 11, fontFamily: 'monospace', height: 1.4)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Fechar')),
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: json));
+              if (!dialogCtx.mounted) return;
+              Navigator.pop(dialogCtx);
+              _snack(context, 'JSON da dieta copiado');
+            },
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('Copiar'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              final feedback = await _saveDietFile(json);
+              if (feedback == null || !dialogCtx.mounted) return;
+              Navigator.pop(dialogCtx);
+              _snack(context, feedback);
+            },
+            icon: const Icon(Icons.save_alt, size: 16),
+            label: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Salva o JSON como arquivo. Retorna o feedback (null = usuário cancelou).
+  Future<String?> _saveDietFile(String json) async {
+    try {
+      final uri = await FilePicker.platform.saveFile(
+        dialogTitle: 'Salvar dieta',
+        fileName: DietTransfer.fileName,
+        bytes: Uint8List.fromList(utf8.encode(json)),
+      );
+      if (uri == null) return null;
+      return 'Dieta exportada em ${DietTransfer.fileName}';
+    } catch (e) {
+      return 'Falha ao salvar o arquivo: $e';
+    }
+  }
+
+  /// Lê o arquivo escolhido. Retorna null quando o usuário cancela.
+  Future<({String? text, String? error})?> _pickDietFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+        dialogTitle: 'Selecionar dieta exportada',
+      );
+      if (result == null || result.files.isEmpty) return null;
+      final bytes = result.files.first.bytes;
+      if (bytes == null) {
+        return (text: null, error: 'Não foi possível ler o conteúdo do arquivo.');
+      }
+      return (text: utf8.decode(bytes, allowMalformed: true), error: null);
+    } catch (e) {
+      return (text: null, error: 'Falha ao ler o arquivo: $e');
+    }
+  }
+
+  /// Dialog de importação: cola o JSON ou escolhe o arquivo exportado.
+  Future<void> _importDiet(BuildContext context) async {
+    final state = context.read<AppState>();
+    final controller = TextEditingController();
+    String? error;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setState) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: const Text('Importar dieta'),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Cole o JSON exportado em outro dispositivo ou escolha o arquivo .json.',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: controller,
+                  maxLines: 5,
+                  style: const TextStyle(fontSize: 11, fontFamily: 'monospace'),
+                  decoration: const InputDecoration(hintText: '{"format": "nutricoach-dieta", ...}'),
+                ),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: () async {
+                    final picked = await _pickDietFile();
+                    if (picked == null) return;
+                    setState(() {
+                      if (picked.text != null) controller.text = picked.text!;
+                      error = picked.error;
+                    });
+                  },
+                  icon: const Icon(Icons.folder_open, size: 16),
+                  label: const Text('Escolher arquivo'),
+                ),
+                if (error != null)
+                  Text(error!, style: const TextStyle(color: AppTheme.danger, fontSize: 12)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancelar')),
+            FilledButton.icon(
+              onPressed: () async {
+                try {
+                  final plan = await state.importDiet(controller.text);
+                  if (!dialogCtx.mounted) return;
+                  Navigator.pop(dialogCtx);
+                  _snack(context, 'Dieta importada: ${plan.name} · ${plan.meals.length} refeições');
+                } on FormatException catch (e) {
+                  setState(() => error = e.message);
+                } catch (e) {
+                  setState(() => error = 'Falha ao importar: $e');
+                }
+              },
+              icon: const Icon(Icons.download, size: 16),
+              label: const Text('Importar'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -336,8 +524,9 @@ class _DietDailyListState extends State<_DietDailyList> {
 }
 
 class _EmptyDiet extends StatelessWidget {
-  const _EmptyDiet({required this.onCreate});
+  const _EmptyDiet({required this.onCreate, required this.onImport});
   final VoidCallback onCreate;
+  final VoidCallback onImport;
 
   @override
   Widget build(BuildContext context) {
@@ -355,6 +544,18 @@ class _EmptyDiet extends StatelessWidget {
             const SizedBox(height: 20),
             FilledButton.icon(onPressed: onCreate, icon: const Icon(Icons.add), label: const Text('Criar dieta')),
             const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: onImport,
+              icon: const Icon(Icons.download_outlined, size: 18),
+              label: const Text('Importar dieta'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.textSecondary,
+                side: const BorderSide(color: AppTheme.border),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('Já montou a dieta em outro dispositivo? Importe o arquivo JSON exportado de lá.', textAlign: TextAlign.center, style: TextStyle(color: AppTheme.textMuted, fontSize: 12, height: 1.4)),
+            const SizedBox(height: 8),
             const Text('Você pode registrar refeições manualmente mesmo sem dieta.', style: TextStyle(color: AppTheme.textMuted, fontSize: 12)),
           ],
         ),

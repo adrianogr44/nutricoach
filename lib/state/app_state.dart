@@ -18,6 +18,7 @@ import '../data/models/user_profile.dart';
 import '../data/repositories/cloud_sync.dart';
 import '../data/repositories/local_store.dart';
 import '../services/bioimpedance_text_parser.dart';
+import '../services/diet_transfer.dart';
 import '../services/household_measure.dart';
 import '../services/insight_rules_engine.dart';
 import '../services/meal_text_parser.dart';
@@ -208,6 +209,38 @@ class AppState extends ChangeNotifier {
     _activeDietId = id;
     _persistDiet();
     notifyListeners();
+  }
+
+  /// Importa dieta exportada em outro dispositivo/navegador (JSON offline).
+  ///
+  /// [DietTransfer.decode] valida o arquivo e lança [FormatException] com
+  /// mensagem amigável. Se já existir plano com o mesmo id, substitui
+  /// (importar de novo não duplica); caso contrário cria um id novo.
+  Future<DietPlan> importDiet(String raw) async {
+    final plan = DietTransfer.decode(raw);
+    // Mantém o id do arquivo quando ele não colide — importar de novo
+    // substitui o mesmo plano em vez de duplicar. Sem id, gera um novo.
+    final stored = plan.id.isEmpty
+        ? DietPlan(
+            id: _uuid.v4(),
+            name: plan.name,
+            meals: plan.meals,
+            createdAt: plan.createdAt ?? DateTime.now(),
+            updatedAt: DateTime.now(),
+            isActive: true,
+          )
+        : plan;
+
+    final idx = _dietPlans.indexWhere((d) => d.id == stored.id);
+    if (idx >= 0) {
+      _dietPlans[idx] = stored;
+    } else {
+      _dietPlans.add(stored);
+    }
+    _activeDietId = stored.id;
+    _persistDiet();
+    notifyListeners();
+    return stored;
   }
 
   Future<DietMeal> addDietMeal(String planId, {required String name, String? time}) async {
