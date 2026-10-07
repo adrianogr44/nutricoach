@@ -1,11 +1,15 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models/training.dart';
+import '../../services/training_transfer.dart';
 import '../../state/app_state.dart';
 import 'active_training_screen.dart';
 import 'training_editor.dart';
@@ -35,9 +39,9 @@ class _TrainingHomeScreenState extends State<TrainingHomeScreen> {
     final plan = state.activeTrainingPlan;
 
     if (plan == null || plan.days.isEmpty) {
-      return const Scaffold(
+      return Scaffold(
         backgroundColor: Colors.transparent,
-        body: _EmptyTraining(),
+        body: _EmptyTraining(onImport: () => _importTraining()),
       );
     }
 
@@ -168,6 +172,186 @@ class _TrainingHomeScreenState extends State<TrainingHomeScreen> {
     return 'último ${last.date.day.toString().padLeft(2, '0')}/${last.date.month.toString().padLeft(2, '0')}';
   }
 
+  // ── Exportar / importar ──
+
+  void _snack(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  /// Dialog de exportação: copia o JSON para a área de transferência ou
+  /// salva em arquivo — os dois caminhos funcionam offline.
+  Future<void> _exportTraining(TrainingPlan plan) async {
+    final json = TrainingTransfer.export(plan);
+    final exerciseCount = plan.days.fold<int>(0, (sum, d) => sum + d.totalExercises);
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        backgroundColor: AppTheme.surface,
+        title: Text('Exportar treino', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800)),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${plan.name} · ${plan.days.length} dias · $exerciseCount exercícios',
+                style: GoogleFonts.inter(color: AppTheme.textPrimary, fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'Copie o JSON ou salve o arquivo e importe em outro aparelho. Funciona sem internet. O histórico de sessões fica neste aparelho.',
+                style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 200),
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceLight,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppTheme.border),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(json, style: GoogleFonts.jetBrainsMono(color: AppTheme.textMuted, fontSize: 11, height: 1.4)),
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Fechar')),
+          FilledButton.icon(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: json));
+              if (!dialogCtx.mounted) return;
+              Navigator.pop(dialogCtx);
+              _snack('JSON do treino copiado');
+            },
+            icon: const Icon(Icons.copy, size: 16),
+            label: const Text('Copiar'),
+          ),
+          FilledButton.icon(
+            onPressed: () async {
+              final feedback = await _saveTrainingFile(json);
+              if (feedback == null || !dialogCtx.mounted) return;
+              Navigator.pop(dialogCtx);
+              _snack(feedback);
+            },
+            icon: const Icon(Icons.save_alt, size: 16),
+            label: const Text('Salvar'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Salva o JSON como arquivo. Retorna o feedback (null = usuário cancelou).
+  Future<String?> _saveTrainingFile(String json) async {
+    try {
+      final uri = await FilePicker.platform.saveFile(
+        dialogTitle: 'Salvar treino',
+        fileName: TrainingTransfer.fileName,
+        bytes: Uint8List.fromList(utf8.encode(json)),
+      );
+      if (uri == null) return null;
+      return 'Treino exportado em ${TrainingTransfer.fileName}';
+    } catch (e) {
+      return 'Falha ao salvar o arquivo: $e';
+    }
+  }
+
+  /// Lê o arquivo escolhido. Retorna null quando o usuário cancela.
+  Future<({String? text, String? error})?> _pickTrainingFile() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.any,
+        withData: true,
+        dialogTitle: 'Selecionar treino exportado',
+      );
+      if (result == null || result.files.isEmpty) return null;
+      final bytes = result.files.first.bytes;
+      if (bytes == null) {
+        return (text: null, error: 'Não foi possível ler o conteúdo do arquivo.');
+      }
+      return (text: utf8.decode(bytes, allowMalformed: true), error: null);
+    } catch (e) {
+      return (text: null, error: 'Falha ao ler o arquivo: $e');
+    }
+  }
+
+  /// Dialog de importação: cola o JSON ou escolhe o arquivo exportado.
+  Future<void> _importTraining() async {
+    final state = context.read<AppState>();
+    final controller = TextEditingController();
+    String? error;
+
+    await showDialog<void>(
+      context: context,
+      builder: (dialogCtx) => StatefulBuilder(
+        builder: (dialogCtx, setState) => AlertDialog(
+          backgroundColor: AppTheme.surface,
+          title: Text('Importar treino', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w800)),
+          content: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 420),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Cole o JSON exportado em outro aparelho ou escolha o arquivo .json.',
+                  style: GoogleFonts.inter(color: AppTheme.textSecondary, fontSize: 12, height: 1.4),
+                ),
+                const SizedBox(height: 10),
+                TextField(
+                  controller: controller,
+                  maxLines: 5,
+                  style: GoogleFonts.jetBrainsMono(fontSize: 11),
+                  decoration: const InputDecoration(hintText: '{"format": "nutricoach-treino", ...}'),
+                ),
+                const SizedBox(height: 4),
+                TextButton.icon(
+                  onPressed: () async {
+                    final picked = await _pickTrainingFile();
+                    if (picked == null) return;
+                    setState(() {
+                      if (picked.text != null) controller.text = picked.text!;
+                      error = picked.error;
+                    });
+                  },
+                  icon: const Icon(Icons.folder_open, size: 16),
+                  label: const Text('Escolher arquivo'),
+                ),
+                if (error != null)
+                  Text(error!, style: GoogleFonts.inter(color: AppTheme.danger, fontSize: 12)),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('Cancelar')),
+            FilledButton.icon(
+              onPressed: () async {
+                try {
+                  final plan = await state.importTrainingPlan(controller.text);
+                  if (!dialogCtx.mounted) return;
+                  Navigator.pop(dialogCtx);
+                  _snack('Treino importado: ${plan.name} · ${plan.days.length} dias');
+                } on FormatException catch (e) {
+                  setState(() => error = e.message);
+                } catch (e) {
+                  setState(() => error = 'Falha ao importar: $e');
+                }
+              },
+              icon: const Icon(Icons.download, size: 16),
+              label: const Text('Importar'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── FICHA ──
 
   Widget _buildFicha(AppState state, TrainingPlan plan) {
@@ -254,6 +438,33 @@ class _TrainingHomeScreenState extends State<TrainingHomeScreen> {
               ),
             ),
           ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('export-training'),
+                onPressed: () => _exportTraining(plan),
+                icon: const Icon(Icons.ios_share_outlined, size: 16),
+                label: const Text('Exportar'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                key: const Key('import-training'),
+                onPressed: _importTraining,
+                icon: const Icon(Icons.download_outlined, size: 16),
+                label: const Text('Importar'),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 12),
+        Text(
+          'Leve a ficha para outro aparelho pelo JSON. O histórico de sessões fica neste dispositivo.',
+          style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textMuted, height: 1.4),
         ),
       ],
     );
@@ -538,7 +749,9 @@ class _AchievementList extends StatelessWidget {
 }
 
 class _EmptyTraining extends StatelessWidget {
-  const _EmptyTraining();
+  const _EmptyTraining({required this.onImport});
+  final VoidCallback onImport;
+
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -563,6 +776,23 @@ class _EmptyTraining extends StatelessWidget {
               onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainingEditor())),
               icon: const Icon(Icons.add, size: 18),
               label: Text('Criar treino', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700)),
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const Key('import-training-empty'),
+              onPressed: onImport,
+              icon: const Icon(Icons.download_outlined, size: 18),
+              label: const Text('Importar treino'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppTheme.textSecondary,
+                side: const BorderSide(color: AppTheme.border),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Já montou a ficha em outro aparelho? Importe o arquivo JSON exportado de lá.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.inter(color: AppTheme.textMuted, fontSize: 12, height: 1.4),
             ),
           ],
         ),

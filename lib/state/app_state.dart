@@ -23,6 +23,7 @@ import '../services/household_measure.dart';
 import '../services/insight_rules_engine.dart';
 import '../services/meal_text_parser.dart';
 import '../services/nutrition_label_text_parser.dart';
+import '../services/training_transfer.dart';
 import '../data/models/diet.dart';
 
 /// Estado central do app (ChangeNotifier). Offline-first com persistência
@@ -427,6 +428,36 @@ class AppState extends ChangeNotifier {
     _activeTrainingPlanId = id;
     _persistTraining();
     notifyListeners();
+  }
+
+  /// Importa uma ficha exportada em JSON ([TrainingTransfer.decode]).
+  ///
+  /// Mantém o id do arquivo quando ele não colide — importar de novo
+  /// substitui o mesmo plano em vez de duplicar. Sem id, gera um novo.
+  /// A ficha importada passa a ser o plano ativo.
+  Future<TrainingPlan> importTrainingPlan(String raw) async {
+    final plan = TrainingTransfer.decode(raw);
+    final stored = plan.id.isEmpty
+        ? TrainingPlan(
+            id: _uuid.v4(),
+            name: plan.name,
+            days: plan.days,
+            createdAt: plan.createdAt ?? DateTime.now(),
+            updatedAt: DateTime.now(),
+            isActive: true,
+          )
+        : plan;
+
+    final idx = _trainingPlans.indexWhere((p) => p.id == stored.id);
+    if (idx >= 0) {
+      _trainingPlans[idx] = stored;
+    } else {
+      _trainingPlans.add(stored);
+    }
+    _activeTrainingPlanId = stored.id;
+    _persistTraining();
+    notifyListeners();
+    return stored;
   }
 
   Future<TrainingDay> addTrainingDay(String planId, {required String name, int? weekday, String? time}) async {
