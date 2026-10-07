@@ -1,0 +1,12 @@
+# Fontes/scripts que não subir
+.dart_tool/
+.idea/
+.vscode/
+*.iml
+test/
+tool/
+server.log
+server.err.log
+serve.py
+.pub-cache/
+lib/config/secrets.dart

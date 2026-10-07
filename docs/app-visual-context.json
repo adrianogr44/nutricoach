@@ -1,0 +1,213 @@
+{
+  "project": {
+    "name": "NutriCoach",
+    "fullName": "NutriCoach — Caderno de Dieta Fixa",
+    "version": "1.0.0+1",
+    "description": "App mobile 100% offline-first para quem segue dieta fixa do nutricionista. Dieta como template planejado vs diário real (o que comi). 1 toque 'Comi como planejado'. Sem IA generativa.",
+    "audience": "Brasileiros 25-45 anos em dieta fixa, querem logar rápido sem planilha. Usam medidas caseiras (concha, xícara, colher).",
+    "singleJob": "Home responde em 3s: Como está meu dia? O que falta? O que faço agora?",
+    "platform": "Flutter 3.44.8 / Dart 3.12.2 — Web, Android, iOS",
+    "repository": "C:/Users/adria/Documents/segundo-cerebro/nutricoach_ai",
+    "productionUrl": "https://nutricoachai-wheat.vercel.app",
+    "previewUrl": "https://nutricoach-9m0h6bxk9-adrianogr44s-projects.vercel.app",
+    "localUrl": "http://localhost:8080"
+  },
+  "stack": {
+    "framework": "Flutter 3.44.8",
+    "state": "Provider + ChangeNotifier (AppState)",
+    "persistence": "SharedPreferences (LocalStore) + CloudSync Firestore opcional",
+    "charts": "fl_chart 1.2.0",
+    "fonts": "google_fonts 6.2.1 (Space Grotesk, Inter, JetBrains Mono)",
+    "ocr": "google_mlkit_text_recognition 0.17.1 (on-device)",
+    "database": "TACO 4a ed. 597 alimentos + TBCA + OpenFoodFacts (barcode) + customFoods",
+    "build": "flutter build web -> build/web, serve.py port 8080, vercel.json outputDirectory build/web"
+  },
+  "designSystem": {
+    "philosophy": "Minimalista premium 2026, escuro, leve, sem cards empilhados. Inspirado Linear/Raycast/Vercel mas com voz própria. Risco: números como marca (Space Grotesk 800 tabular).",
+    "colors": {
+      "background": "#070A0F",
+      "backgroundSubtle": "#0A0F14",
+      "backgroundElevated": "#0F141B",
+      "surface": "#121821",
+      "surfaceLight": "#1A2330",
+      "surfaceHover": "#1E2A3A",
+      "border": "#1E2A38 (0.8px)",
+      "borderStrong": "#243247",
+      "textPrimary": "#F1F5F9",
+      "textSecondary": "#8DA0B8",
+      "textMuted": "#5F7288",
+      "textFaint": "#3D4E62",
+      "primary": "#00E6A0 (só progresso/CTA)",
+      "primarySoft": "#00B87A",
+      "accent": "#3B82F6",
+      "warning": "#F59E0B",
+      "danger": "#EF4444",
+      "macroProtein": "#A78BFA",
+      "macroCarbs": "#FBBF24",
+      "macroFat": "#60A5FA",
+      "macroWater": "#22D3EE"
+    },
+    "typography": {
+      "display": "Space Grotesk 800, -1.8 tracking, tabularFigures, 52px hero (count-up 900ms)",
+      "heading": "Space Grotesk 700 28px / Inter 700 22px",
+      "title": "Inter 700 18px -0.2",
+      "body": "Inter 500 14px 1.5",
+      "caption": "JetBrains Mono 600 11px 0.4 tracking, tabularFigures para kcal/macros/água",
+      "scale": "display 52 / heading 28 / section 18-22 / body 14-16 / caption 11-12, clamp() onde apropriado"
+    },
+    "radius": {
+      "xs": 8,
+      "sm": 12,
+      "md": 16,
+      "lg": 20,
+      "xl": 28,
+      "full": 999
+    },
+    "spacing": {
+      "xs": 4,
+      "sm": 8,
+      "md": 16,
+      "lg": 24,
+      "xl": 32
+    },
+    "shadows": {
+      "soft": "0 8 20 rgba(0,0,0,0.20) + 0 1 4 rgba(0,0,0,0.12)",
+      "subtle": "0 4 12 rgba(0,0,0,0.12)"
+    },
+    "layout": {
+      "maxWidth": 1180,
+      "centeredContainer": "Align topCenter + ConstrainedBox 1180",
+      "background": "LinearGradient backgroundSubtle->background, sem blocos #000/#111",
+      "headerDesktop": "Logo N 32 + NutriCoach -0.5 + nav tabs Hoje/Histórico/Check-in/Coach + +Registrar pill + avatar",
+      "headerMobile": "Logo + restaurant_menu + avatar, bottomNav 64px surface 0.96 + divider 0.8",
+      "responsiveBreakpoint": 900
+    },
+    "signature": "Timeline vertical: hora JetBrainsMono 11px + dot 10px + linha conectora que preenche com progresso — representa jornada do dia (07:30, 12:30), não card. Nenhum template usa tempo como eixo principal."
+  },
+  "screens": {
+    "home": {
+      "route": "/ (HomeShell index 0 -> DashboardScreen)",
+      "file": "lib/features/dashboard/dashboard_screen.dart",
+      "hierarchy": "Olá, Adriano → Hero 1.684 kcal → Insight → Macros 3 col → Timeline Hoje → Água → Academia/Peso/Bio linhas → Chart 110px",
+      "components": {
+        "Greeting": {
+          "file": "dashboard_screen.dart:58",
+          "desc": "Space Grotesk 32 800 -1.0 + eyebrow 11 mono 'QUINTA, 3 SETEMBRO' com traço 24x1.5 primary 0.6",
+          "data": "profile.name, Formatters.dayLabel(DateTime.now())"
+        },
+        "HeroCalories": {
+          "file": "dashboard_screen.dart:82",
+          "desc": "Container surface 0.62, radius 20, border 0.8, shadowSubtle. Esquerda: TweenAnimationBuilder count-up 52px Space Grotesk 800 tabular + 'kcal consumidas' 12 + 'de 2492' JetBrainsMono 11. Direita: pill restantes. Barra 6px LinearProgress + dot removido (1 indicador só). Pill Déficit 11px com trending icon.",
+          "data": "summary.kcalConsumed, summary.metaKcal, remaining, pct, status (DayStatus), balanceKcal",
+          "motion": "900ms easeOutCubic, respect disableAnimations"
+        },
+        "InsightInline": {
+          "file": "dashboard_screen.dart:159",
+          "desc": "surface 0.72, radius 14, border 0.8, icon 28 com alpha 0.12, title 12 700, message 13 1.4, 'Ver →' ghost. Não alerta vermelho se manhã e low priority.",
+          "data": "state.insights.daily(today) sorted priority, primary",
+          "empty": "SizedBox.shrink if insights.isEmpty"
+        },
+        "MacroStrip": {
+          "file": "dashboard_screen.dart:391",
+          "desc": "3 Expanded columns, label 11 muted, RichText 18/800 tabular + 12 muted, bar 4px 999. Cor muted se 0 de manhã.",
+          "data": "today.metaProtein/Carbs/Fat, metrics.protein/carbs/fat",
+          "colors": "protein #A78BFA, carbs #FBBF24, fat #60A5FA"
+        },
+        "MealsToday": {
+          "file": "dashboard_screen.dart:454",
+          "desc": "Se hasDiet: timeline diet meals com dot 10 + time 11 mono, nome 14 600 (lineThrough se consumed), kcal 12 muted, preview 'Arroz 1 concha · aprox. 90g' 12, botão Registrar 32 pill ou Registrado success 0.10. Se !hasDiet: empty 'Nenhuma refeição ainda' 56 icon + +Registrar.",
+          "data": "state.activeDiet.meals, state.dietMealStatusFor, dietMeal.totals(foodMap), today.meals",
+          "actions": "Comi como planejado -> logDietMeal, Editar hoje/Trocar -> _PartialDietSheet"
+        },
+        "WaterCompact": {
+          "file": "dashboard_screen.dart:280",
+          "desc": "Row: barra 4px macroWater + + 36 circular (12 alpha, 20 border). 1,8/3,0 L mono.",
+          "data": "metrics.water, today.metaWater",
+          "action": "tap + addWater 250"
+        },
+        "SecondaryStats": {
+          "file": "dashboard_screen.dart:310",
+          "desc": "3 linhas com 36 icon + divider 0.8, não cards: Academia, Peso, Bioimpedância",
+          "data": "summary.kcalBurned, weight, perdido, bio.pontuacao/tmb"
+        },
+        "CalorieChartMinimal": {
+          "file": "dashboard_screen.dart:355",
+          "desc": "110px LineChart, grid 0.8, line 2.2, área 0.18, meta dash 4 4",
+          "data": "state.lastDays(7), meta"
+        }
+      },
+      "emptyStates": "MealsToday empty com ícone 56 + texto humano + CTA, não retângulo vazio",
+      "cta": "Header +Registrar (desktop) e timeline Registrar (mobile) — 1 representação principal",
+      "issuesBefore": "Card dentro de card, bordas 1px em tudo, 100% width 1700px, hero espaço enorme info pequena, macros como formulário, 2 bolas verdes duplicadas (dot barra + pill) — corrigido removendo dot"
+    },
+    "diet": {
+      "route": "/diet -> DietScreen",
+      "file": "lib/features/diet/diet_screen.dart",
+      "desc": "Header Minha Dieta + 2.492 kcal 28/800 + chips P/C/G + lista refeições 07:30 Café (421 kcal) com divider, sem card gigante. Empty _EmptyDiet com ícone 80 + CTA Criar dieta.",
+      "editor": "lib/features/diet/diet_meal_editor.dart — nome + chips sugestão, time, lista itens 14/600 + display '1 concha · aprox. 90g · 76 kcal', +Adicionar alimento via FoodSearch compact + showDietQuantityPicker (qty + unit dropdown + preview + custom grams)"
+    },
+    "history": {
+      "route": "HistoryScreen",
+      "desc": "Calendário com status 🟢/🟡/🔴 por dia, DayDetailCard com refeições, macros, insights determinísticos (não IA)"
+    },
+    "checkin": {
+      "route": "CheckinScreen",
+      "desc": "Check-in determinístico com checkIn() textual mono + insights, sem LLM"
+    },
+    "coach": {
+      "route": "CoachScreen",
+      "desc": "Insights locais — sem chat. Greeting + 'Insights locais — sem IA generativa' + Foco de hoje card + Hoje/Semana rows + Ações rápidas Wrap ActionChip, sem TextField"
+    },
+    "meals": {
+      "addMealHub": "AddMealScreen — 5 opções: Descrever refeição, Montar refeição completa (ManualMealScreen multi-item), Pesquisar alimento, Foto tabela OCR, Favoritos",
+      "manualMeal": "ManualMealScreen — tipo dropdown + lista itens + total 22/800 + Registrar",
+      "foodSearch": "FoodSearchScreen — TACO 597 + OpenFoodFacts, _QuantitySheet com household measures + preview ≈ Xg · Y kcal",
+      "mealTextEntry": "MealTextEntry — parser local MealTextParser.parse('200g arroz, 1 concha feijão') -> match() contra FoodDatabase, sem LLM"
+    }
+  },
+  "models": {
+    "Food": "id, name, category, kcal/protein/carbs/fat/fiber/sodium por 100g, standardPortionGrams, aliases, source, barcode/brand, nutritionFor(grams)",
+    "Meal": "id, date, type (cafeDaManha/almoco/lanche/jantar/ceia/outro com label/emoji), items: MealItem(food, quantityGrams), totalKcal/Protein/Carbs/Fat, toJson/fromJson",
+    "DailySummary": "date, meals, workouts, waterRecords, weightKg, profile -> kcalConsumed, protein/carbs/fat, kcalBurned, waterMl, metaKcal/Protein/Carbs/Fat/Water, balanceKcal, status (deficit/maintenance/surplus)",
+    "DietPlan": "id, name, meals: DietMeal[], createdAt/updatedAt, isActive, totalsWith(foodById)",
+    "DietMeal": "id, name, time (07:30), order, items: DietMealItem[], totals(foodById)",
+    "DietMealItem": "foodId, quantity, unit (MeasureUnit), customGramsPerUnit, foodSnapshot, gramsFor(food), nutritionFor(food)",
+    "MeasureUnit": "g, kg, ml, l, unidade, fatia, colherCha, colherSopa, concha, xicara, copo, porcao, pegador — HouseholdMeasureConverter.toGrams(food, qty, unit) com tabela per-food (arroz 45/concha, feijão 90/concha) + genéricos + custom",
+    "UserProfile": "pesoAtual/altura/idade/sexo/objetivo/nivelAtividade -> TMB/TDEE/IMC, metas kcal/proteina/carb/gordura/agua"
+  },
+  "stateAndPersistence": {
+    "AppState": "ChangeNotifier, LocalStore (SharedPreferences JSON) + CloudSync Firestore opcional. Campos: _meals/_workouts/_weights/_measurements/_photos/_water/_bioimpedances/_favoriteIds/_customFoods + _dietPlans/_activeDietId. Métodos: init(), _persist(), _persistDiet(), createDiet, addDietMeal, logDietMeal({selectedIndices, quantityOverrides, substitutions}) clone desacoplado, dietMealStatusFor, dashboardMetrics(), insights (InsightRulesEngine)",
+    "LocalStoreKeys": "profile, meals, workouts, weights, measurements, photos, water, favorites, custom_foods, bioimpedances, diet_plans, active_diet_id"
+  },
+  "realContentExamples": {
+    "hero": { "consumed": 1684, "meta": 2492, "remaining": 808, "status": "deficit", "balance": -412 },
+    "macros": { "protein": { "value": 132, "goal": 170 }, "carbs": { "value": 181, "goal": 240 }, "fat": { "value": 51, "goal": 70 }, "water": { "value": 1800, "goal": 3000 } },
+    "diet": {
+      "name": "Minha Dieta",
+      "totals": { "kcal": 2492, "protein": 170, "carbs": 250, "fat": 70 },
+      "meals": [
+        { "time": "07:30", "name": "Café da manhã", "kcal": 421, "items": ["2 ovos (unidade 50g)", "2 fatias pão integral (25g)", "200 ml leite (copo)"] },
+        { "time": "12:30", "name": "Almoço", "kcal": 687, "items": ["150g arroz (45g/concha)", "1 concha feijão (90g)", "180g frango (fatia 40g)"] }
+      ]
+    },
+    "insight": { "title": "Proteína abaixo da meta", "message": "Ainda faltam 38g de proteína para sua meta de hoje.", "severity": "warning", "priority": "high", "action": "Ver opções", "route": "/diet" },
+    "history": { "date": "2026-05-11", "meals": 3, "kcal": 1684, "status": "deficit" }
+  },
+  "currentIssuesAndGoals": {
+    "fixed": ["Encoding UTF-8 (ProteÃ­na→Proteína, RefeiÃ§Ãµes→Refeições) via byte-fix C3 83 C2 A1→C3 A1", "Removido LLM 5 arquivos + api/chat.js + vercel proxy, substituído por InsightRulesEngine/MealTextParser/DeviceTextRecognizer", "Home de cards empilhados → orgânica com timeline e hero tabular", "2 bolas verdes duplicadas no Déficit — removido dot da barra"],
+    "remainingGoals": ["Tornar Home ainda menos template: hero com thesis mais editorial que big number + bar (talvez plate visual)", "Tipografia pairing mais ousada: Space Grotesk já adicionado mas pode explorar serif display para greeting", "Microinterações orquestradas: hero count-up 900ms já, mas timeline stagger + skeleton ainda sutil", "Preparar Minha Dieta para múltiplas dietas e histórico de adesão (planned vs consumed)"],
+    "constraints": ["Não destruir cálculos/banco/metas/persistência", "Não mockar dados — usar DailySummary reais", "Manter dark premium, não cards excessivos, não bordas verdes em tudo", "Mobile first mas desktop com container 1180 e header nav, não bottom nav em desktop"]
+  },
+  "promptForGpt": {
+    "instruction": "Você é lead de design de estúdio boutique. Gere um PROMPT único, opinativo e específico para refinar visual do NutriCoach (app dieta fixa, não contador genérico). Use subject, paleta, tipo, layout e assinatura já definidos, mas proponha 1 risco estético novo que você justificaria para cliente que rejeitou templates.",
+    "requirements": [
+      "Baseado em subject real: caderno de dieta fixa com medidas caseiras (concha, xícara), timeline 07:30-20:00, público BR 25-45a, job 'Como está meu dia?' em 3s",
+      "Especifique paleta com hex exatos (não 'dark + green'), tipografia com nomes reais (ex: Space Grotesk 800 + Inter + JetBrains Mono) e escala, layout com ASCII wireframe, e 1 assinatura memorável",
+      "Critique se seu plano cai nos 3 defaults (cream+serif/terracotta, near-black+acid green, broadsheet) — se sim, revise e diga o que mudou e por quê",
+      "Saída deve ser PROMPT pronto para gerar código Flutter/web, não o código. Inclua copy real em PT-BR (ex: 'Faltam 38g de proteína', '1 concha · aprox. 90g') e estados vazio/erro",
+      "Mantenha dark premium, sem cards excessivos, sem bordas 1px em tudo, com tabularFigures para números, e 1 CTA principal consistente"
+    ],
+    "outputFormat": "JSON com {designBrief, tokens, rationale, prompt} onde prompt é string única pronta para LLM de código",
+    "examplePromptStart": "Redesign NutriCoach Home as 2026 health editorial: hero is Space Grotesk 52 tabular count-up with 6px bar (no dot) + pill deficit, timeline vertical with time mono + dot, macros as 3 tiny columns... [continue específico]"
+  }
+}
