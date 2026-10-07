@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
@@ -7,11 +9,25 @@ import '../../data/models/training.dart';
 import '../../state/app_state.dart';
 import 'active_training_screen.dart';
 import 'training_editor.dart';
+import 'training_history_view.dart';
+import 'training_stats.dart';
+import 'training_widgets.dart';
 
-/// Treino Home — inspirado em GymRats: energia, ação clara, pouco ruído.
-/// Pergunta central: O que vou treinar hoje?
-class TrainingHomeScreen extends StatelessWidget {
+/// Aba Treino — foco em executar o treino de hoje.
+/// Organização interna: Hoje · Ficha · Histórico (nenhuma aba global nova).
+class TrainingHomeScreen extends StatefulWidget {
   const TrainingHomeScreen({super.key});
+
+  @override
+  State<TrainingHomeScreen> createState() => _TrainingHomeScreenState();
+}
+
+class _TrainingHomeScreenState extends State<TrainingHomeScreen> {
+  int _tab = 0;
+  String? _selectedDayId;
+
+  /// Troca a aba (usado pelas ações do cabeçalho).
+  void selectTab(int index) => setState(() => _tab = index);
 
   @override
   Widget build(BuildContext context) {
@@ -19,304 +35,510 @@ class TrainingHomeScreen extends StatelessWidget {
     final plan = state.activeTrainingPlan;
 
     if (plan == null || plan.days.isEmpty) {
-      return Scaffold(
+      return const Scaffold(
         backgroundColor: Colors.transparent,
-        body: _EmptyTraining(onCreate: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrainingEditor(plan: plan)))),
+        body: _EmptyTraining(),
       );
     }
 
     final today = plan.today;
-    final sessions = state.trainingSessions.take(5).toList();
+    final selectedId = _selectedDayId ?? today?.id ?? plan.days.first.id;
+    final selectedDay = plan.days.where((d) => d.id == selectedId).toList();
+    final day = selectedDay.isNotEmpty ? selectedDay.first : plan.days.first;
+    final active = state.activeTrainingSession;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
         children: [
-          _HeaderGreeting(),
+          _Header(plan: plan, state: state),
+          const SizedBox(height: 14),
+          _SegmentedTabs(
+            index: _tab,
+            onChanged: (i) => setState(() => _tab = i),
+          ),
           const SizedBox(height: 20),
-          if (today != null) _TodayHero(day: today, plan: plan),
-          const SizedBox(height: 28),
-          _WeekStrip(plan: plan),
-          const SizedBox(height: 28),
-          _NextUp(plan: plan),
-          const SizedBox(height: 28),
-          _RecentHistory(sessions: sessions, plan: plan),
+          switch (_tab) {
+            0 => _buildHoje(state, plan, today, day, active),
+            1 => _buildFicha(state, plan),
+            _ => const TrainingHistoryView(),
+          },
         ],
       ),
     );
   }
-}
 
-class _HeaderGreeting extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final name = context.watch<AppState>().profile?.name?.split(' ').first ?? 'Atleta';
-    final hour = DateTime.now().hour;
-    final greet = hour < 12 ? 'Bom dia' : hour < 18 ? 'Boa tarde' : 'Boa noite';
+  // ── HOJE ──
+
+  Widget _buildHoje(
+    AppState state,
+    TrainingPlan plan,
+    TrainingDay? today,
+    TrainingDay selectedDay,
+    TrainingSession? active,
+  ) {
+    final sessions = state.trainingSessions;
+    final done = sessions.where((s) => s.status == TrainingStatus.completed).toList();
+    final weeklyTarget = plan.days.length.clamp(1, 7);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('$greet, $name.', style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, letterSpacing: -0.6)),
-        const SizedBox(height: 4),
-        Text('O que vamos treinar hoje?', style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary)),
-      ],
-    );
-  }
-}
-
-class _TodayHero extends StatelessWidget {
-  const _TodayHero({required this.day, required this.plan});
-  final TrainingDay day;
-  final TrainingPlan plan;
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final lastSession = state.trainingSessions.where((s) => s.dayId == day.id).firstOrNull;
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(begin: Alignment.topLeft, end: Alignment.bottomRight, colors: [AppTheme.surface, AppTheme.surfaceLight]),
-        borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-        border: Border.all(color: AppTheme.border, width: 0.8),
-        boxShadow: AppTheme.shadowSubtle,
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(999)),
-                child: Text('HOJE', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppTheme.primary, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
-              ),
-              const Spacer(),
-              Text(day.time ?? '', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textMuted)),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Text(day.name.toUpperCase(), style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, letterSpacing: -0.6)),
-          const SizedBox(height: 6),
-          Text('${day.totalExercises} exercícios · ${day.totalSets} séries · ~${day.estimatedMinutes ?? 55} min', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
-          if (lastSession != null) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              decoration: BoxDecoration(color: AppTheme.surfaceLight, borderRadius: BorderRadius.circular(10), border: Border.all(color: AppTheme.border, width: 0.8)),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.history, size: 12, color: AppTheme.textMuted),
-                  const SizedBox(width: 6),
-                  Text('Último: ${_formatDate(lastSession.date)} · ${lastSession.totalSets} séries', style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textMuted)),
-                ],
-              ),
+        if (active != null) ...[
+          _ActiveBanner(session: active, plan: plan),
+          const SizedBox(height: 14),
+        ],
+        TrainingSummaryCard(
+          streak: TrainingStats.streak(done),
+          best: TrainingStats.bestStreak(done),
+          total: TrainingStats.completedCount(done),
+          weekDone: TrainingStats.weekCount(done),
+          weekTarget: weeklyTarget,
+        ),
+        const SizedBox(height: 24),
+        _SectionTitle('Escolha a divisão'),
+        const SizedBox(height: 12),
+        for (var i = 0; i < plan.days.length; i++)
+          Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: TrainingDivisionCard(
+              day: plan.days[i],
+              index: i,
+              isToday: today != null && plan.days[i].id == today.id,
+              isActive: plan.days[i].id == selectedDay.id,
+              lastLabel: _lastLabel(state, plan.days[i]),
+              onTap: () => setState(() => _selectedDayId = plan.days[i].id),
             ),
-          ],
-          const SizedBox(height: 16),
+          ),
+        if (active == null) ...[
+          const SizedBox(height: 6),
           SizedBox(
             width: double.infinity,
+            height: 48,
             child: FilledButton(
-              onPressed: () async {
-                final session = await state.startTrainingSession(plan.id, day.id);
-                if (context.mounted) Navigator.push(context, MaterialPageRoute(builder: (_) => ActiveTrainingScreen(session: session, day: day)));
-              },
-              style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(48), backgroundColor: AppTheme.primary, foregroundColor: AppTheme.textOnPrimary, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(999))),
-              child: Text('INICIAR TREINO', style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.4)),
+              key: const Key('start-training'),
+              onPressed: () => _start(state, plan, selectedDay),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppTheme.primary,
+                foregroundColor: AppTheme.textOnPrimary,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusFull)),
+              ),
+              child: Text('INICIAR TREINO', style: GoogleFonts.spaceGrotesk(fontSize: 14, fontWeight: FontWeight.w800, letterSpacing: 0.6)),
             ),
           ),
-          const SizedBox(height: 12),
-          // Preview exercícios (sem card gigante)
-          for (final ex in day.exercises.take(5))
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                children: [
-                  Expanded(child: Text(ex.name, style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textPrimary, fontWeight: FontWeight.w600))),
-                  Text('${ex.sets} × ${ex.repsLabel}', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textMuted)),
-                ],
-              ),
-            ),
-          if (day.exercises.length > 5) Text('+${day.exercises.length - 5} exercícios', style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textFaint)),
         ],
-      ),
-    );
-  }
-
-  String _formatDate(DateTime d) => '${d.day.toString().padLeft(2, '0')} ${_month(d.month)}';
-  String _month(int m) => const ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'][m - 1];
-}
-
-class _WeekStrip extends StatelessWidget {
-  const _WeekStrip({required this.plan});
-  final TrainingPlan plan;
-  @override
-  Widget build(BuildContext context) {
-    final state = context.watch<AppState>();
-    final now = DateTime.now();
-    final startOfWeek = now.subtract(Duration(days: now.weekday - 1));
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Sua semana'.toUpperCase(), style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
+        const SizedBox(height: 28),
+        _SectionTitle('Consistência'),
         const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            for (var i = 0; i < 7; i++)
-              Builder(builder: (_) {
-                final date = startOfWeek.add(Duration(days: i));
-                final isToday = date.day == now.day && date.month == now.month;
-                final hasSession = state.trainingSessions.any((s) => s.date.day == date.day && s.date.month == date.month);
-                final dayPlan = plan.days.where((d) => d.weekday == date.weekday % 7).isNotEmpty;
-                String label;
-                IconData icon;
-                Color color;
-                if (hasSession) {
-                  label = '✓';
-                  icon = Icons.check_circle;
-                  color = AppTheme.success;
-                } else if (isToday) {
-                  label = '●';
-                  icon = Icons.circle;
-                  color = AppTheme.primary;
-                } else if (!dayPlan) {
-                  label = '—';
-                  icon = Icons.remove;
-                  color = AppTheme.textFaint;
-                } else {
-                  label = '○';
-                  icon = Icons.circle_outlined;
-                  color = AppTheme.textMuted;
-                }
-                return Column(
-                  children: [
-                    Text(['S', 'T', 'Q', 'Q', 'S', 'S', 'D'][i], style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textMuted, fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Container(
-                      width: 32,
-                      height: 32,
-                      decoration: BoxDecoration(color: isToday ? AppTheme.primary.withValues(alpha: 0.14) : Colors.transparent, shape: BoxShape.circle, border: isToday ? Border.all(color: AppTheme.primary, width: 1.2) : null),
-                      child: Center(child: Text(label, style: TextStyle(color: color, fontSize: 14, fontWeight: FontWeight.w700))),
-                    ),
-                  ],
-                );
-              }),
-          ],
+        Container(
+          key: const Key('consistency-grid'),
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            border: Border.all(color: AppTheme.border, width: 0.8),
+          ),
+          child: ConsistencyGrid(sessions: done),
         ),
-        const SizedBox(height: 10),
-        Text('${state.trainingSessions.where((s) => s.date.isAfter(startOfWeek.subtract(const Duration(days: 1)))).length} treinos esta semana', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary)),
+        const SizedBox(height: 28),
+        _SectionTitle('Conquistas'),
+        const SizedBox(height: 12),
+        _AchievementList(sessions: done, weeklyTarget: weeklyTarget),
       ],
     );
   }
-}
 
-class _NextUp extends StatelessWidget {
-  const _NextUp({required this.plan});
-  final TrainingPlan plan;
-  @override
-  Widget build(BuildContext context) {
-    final now = DateTime.now();
-    final upcoming = plan.days.where((d) => d.weekday != null && d.weekday! > now.weekday % 7).take(2).toList();
-    if (upcoming.isEmpty) return const SizedBox.shrink();
+  Future<void> _start(AppState state, TrainingPlan plan, TrainingDay day) async {
+    final session = await state.startTrainingSession(plan.id, day.id);
+    if (!mounted) return;
+    await Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => ActiveTrainingScreen(session: session, day: day)),
+    );
+  }
+
+  String? _lastLabel(AppState state, TrainingDay day) {
+    TrainingSession? last;
+    for (final s in state.trainingSessions) {
+      if (s.dayId != day.id || s.status != TrainingStatus.completed) continue;
+      if (last == null || s.date.isAfter(last.date)) last = s;
+    }
+    if (last == null) return null;
+    return 'último ${last.date.day.toString().padLeft(2, '0')}/${last.date.month.toString().padLeft(2, '0')}';
+  }
+
+  // ── FICHA ──
+
+  Widget _buildFicha(AppState state, TrainingPlan plan) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Próximos'.toUpperCase(), style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
-        const SizedBox(height: 12),
-        for (final day in upcoming)
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            border: Border.all(color: AppTheme.border, width: 0.8),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(plan.name, style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+              const SizedBox(height: 4),
+              Text(
+                '${plan.days.length} dias · ${plan.days.fold(0, (s, d) => s + d.totalExercises)} exercícios · ${plan.days.fold(0, (s, d) => s + d.totalSets)} séries',
+                style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        for (var i = 0; i < plan.days.length; i++)
           Container(
-            margin: const EdgeInsets.only(bottom: 8),
+            margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(color: AppTheme.surface, borderRadius: BorderRadius.circular(14), border: Border.all(color: AppTheme.border, width: 0.8)),
-            child: Row(
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+              border: Border.all(color: AppTheme.border, width: 0.8),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(day.name, style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                      Text(_weekdayLabel(day.weekday), style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textMuted)),
-                    ],
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      TrainingDivisionCard.letterFor(plan.days[i], i),
+                      style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w800, color: AppTheme.primary),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(plan.days[i].name, style: GoogleFonts.spaceGrotesk(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
+                    ),
+                    Text('${plan.days[i].totalExercises} ex.', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textMuted)),
+                  ],
                 ),
-                const Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted),
+                const SizedBox(height: 8),
+                for (final ex in plan.days[i].exercises)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Expanded(child: Text(ex.name, style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary))),
+                        Text('${ex.sets}×${ex.repsLabel}', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textMuted)),
+                      ],
+                    ),
+                  ),
+                if (plan.days[i].exercises.isEmpty)
+                  Text('Sem exercícios cadastrados', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textFaint)),
               ],
             ),
           ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrainingEditor(plan: plan))),
+                icon: const Icon(Icons.edit_outlined, size: 16),
+                label: const Text('Editar ficha'),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainingEditor())),
+                icon: const Icon(Icons.add, size: 16),
+                label: const Text('Novo plano'),
+              ),
+            ),
+          ],
+        ),
       ],
     );
   }
 
-  String _weekdayLabel(int? wd) {
-    if (wd == null) return '';
-    const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    return days[wd % 7];
+  // ── Cabeçalho e abas ──
+}
+
+class _Header extends StatelessWidget {
+  const _Header({required this.plan, required this.state});
+  final TrainingPlan plan;
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            'TREINO',
+            style: GoogleFonts.spaceGrotesk(fontSize: 26, fontWeight: FontWeight.w800, color: AppTheme.textPrimary, letterSpacing: -1),
+          ),
+        ),
+        _HeaderAction(
+          icon: Icons.history,
+          tooltip: 'Histórico',
+          onTap: () => _scrollTab(context, 2),
+        ),
+        _HeaderAction(
+          icon: Icons.edit_outlined,
+          tooltip: 'Editar ficha',
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => TrainingEditor(plan: plan))),
+        ),
+        _HeaderAction(
+          icon: Icons.swap_horiz,
+          tooltip: 'Trocar plano',
+          onTap: () => _pickPlan(context, state),
+        ),
+      ],
+    );
+  }
+
+  static void _scrollTab(BuildContext context, int tab) {
+    final host = context.findAncestorStateOfType<State<TrainingHomeScreen>>();
+    if (host is _TrainingHomeScreenState) host.selectTab(tab);
+  }
+
+  Future<void> _pickPlan(BuildContext context, AppState state) async {
+    if (state.trainingPlans.length < 2) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Você tem apenas um plano de treino.')),
+      );
+      return;
+    }
+    final chosen = await showModalBottomSheet<TrainingPlan>(
+      context: context,
+      backgroundColor: AppTheme.surface,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl))),
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 18, 20, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Trocar plano', style: GoogleFonts.spaceGrotesk(fontSize: 16, fontWeight: FontWeight.w800)),
+              ),
+            ),
+            for (final p in state.trainingPlans)
+              ListTile(
+                title: Text(p.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                subtitle: Text('${p.days.length} dias', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textMuted)),
+                trailing: p.id == plan.id ? const Icon(Icons.check_circle, color: AppTheme.primary, size: 18) : null,
+                onTap: () => Navigator.pop(ctx, p),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+    if (chosen != null) await state.setActiveTrainingPlan(chosen.id);
   }
 }
 
-class _RecentHistory extends StatelessWidget {
-  const _RecentHistory({required this.sessions, required this.plan});
-  final List<TrainingSession> sessions;
-  final TrainingPlan plan;
+class _HeaderAction extends StatelessWidget {
+  const _HeaderAction({required this.icon, required this.tooltip, required this.onTap});
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
-    if (sessions.isEmpty) return const SizedBox.shrink();
-    // agrupa por mês
-    final byMonth = <String, List<TrainingSession>>{};
-    for (final s in sessions) {
-      final key = '${s.date.month}/${s.date.year}';
-      byMonth.putIfAbsent(key, () => []).add(s);
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text('Últimos treinos'.toUpperCase(), style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 0.8)),
-        const SizedBox(height: 12),
-        for (final entry in byMonth.entries.take(2))
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(entry.key.toUpperCase(), style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textFaint, fontWeight: FontWeight.w700)),
-              const SizedBox(height: 8),
-              for (final s in entry.value)
-                Builder(builder: (_) {
-                  final day = plan.days.where((d) => d.id == s.dayId).firstOrNull;
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(color: AppTheme.surfaceLight.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(12), border: Border.all(color: AppTheme.border, width: 0.8)),
-                    child: Row(
-                      children: [
-                        Container(width: 36, height: 36, decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(10)), child: const Icon(Icons.fitness_center, size: 16, color: AppTheme.primary)),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(day?.name ?? 'Treino', style: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w600)),
-                              Text('${s.date.day.toString().padLeft(2, '0')} ${_month(s.date.month)} · ${s.durationMinutes} min · ${s.totalSets} séries', style: GoogleFonts.inter(fontSize: 11, color: AppTheme.textMuted)),
-                            ],
-                          ),
-                        ),
-                        const Icon(Icons.chevron_right, size: 14, color: AppTheme.textFaint),
-                      ],
-                    ),
-                  );
-                }),
-            ],
-          ),
-      ],
+    return IconButton(
+      onPressed: onTap,
+      tooltip: tooltip,
+      color: AppTheme.textSecondary,
+      constraints: const BoxConstraints(minWidth: 44, minHeight: 44),
+      icon: Icon(icon, size: 20),
     );
   }
+}
 
-  String _month(int m) => const ['jan', 'fev', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'out', 'nov', 'dez'][m - 1];
+class _SegmentedTabs extends StatelessWidget {
+  const _SegmentedTabs({required this.index, required this.onChanged});
+  final int index;
+  final ValueChanged<int> onChanged;
+
+  static const _labels = ['Hoje', 'Ficha', 'Histórico'];
+  static const _keys = ['hoje', 'ficha', 'historico'];
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(4),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+        border: Border.all(color: AppTheme.border, width: 0.8),
+      ),
+      child: Row(
+        children: [
+          for (var i = 0; i < _labels.length; i++)
+            Expanded(
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  key: Key('tab-${_keys[i]}'),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                  onTap: () => onChanged(i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: index == i ? AppTheme.primaryMuted : Colors.transparent,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                      border: index == i ? Border.all(color: AppTheme.primary.withValues(alpha: 0.5), width: 1) : null,
+                    ),
+                    child: Text(
+                      _labels[i],
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        fontWeight: index == i ? FontWeight.w700 : FontWeight.w500,
+                        color: index == i ? AppTheme.primary : AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+  final String text;
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      text.toUpperCase(),
+      style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 1),
+    );
+  }
+}
+
+/// Banner do treino em andamento — tempo decorrido e continuar.
+class _ActiveBanner extends StatefulWidget {
+  const _ActiveBanner({required this.session, required this.plan});
+  final TrainingSession session;
+  final TrainingPlan plan;
+  @override
+  State<_ActiveBanner> createState() => _ActiveBannerState();
+}
+
+class _ActiveBannerState extends State<_ActiveBanner> {
+  Timer? _timer;
+
+  @override
+  void initState() {
+    super.initState();
+    _timer = Timer.periodic(const Duration(seconds: 1), (_) => setState(() {}));
+  }
+
+  @override
+  void dispose() {
+    _timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    TrainingDay? day;
+    for (final d in widget.plan.days) {
+      if (d.id == widget.session.dayId) day = d;
+    }
+    if (day == null) return const SizedBox.shrink();
+    final activeDay = day;
+
+    final state = context.watch<AppState>();
+    TrainingSession session = widget.session;
+    for (final s in state.trainingSessions) {
+      if (s.id == widget.session.id) session = s;
+    }
+    final progress = TrainingStats.sessionProgress(session, day);
+
+    final elapsed = DateTime.now().difference(session.startAt ?? session.date);
+    final mm = elapsed.inMinutes.toString().padLeft(2, '0');
+    final ss = (elapsed.inSeconds % 60).toString().padLeft(2, '0');
+
+    return Semantics(
+      label: 'Treino em andamento, ${day.name}, ${progress.done} de ${progress.total} exercícios',
+      child: Container(
+        key: const Key('active-session-banner'),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppTheme.primaryMuted,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(color: AppTheme.primary, width: 1.2),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                const Icon(Icons.fitness_center, size: 16, color: AppTheme.primary),
+                const SizedBox(width: 8),
+                Text('TREINO EM ANDAMENTO', style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.primary, letterSpacing: 1)),
+                const Spacer(),
+                Text('$mm:$ss', style: GoogleFonts.jetBrainsMono(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.primary)),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(day.name.toUpperCase(), style: GoogleFonts.spaceGrotesk(fontSize: 17, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+            const SizedBox(height: 4),
+            Text('${progress.done}/${progress.total} exercícios · ${session.totalSets} séries', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textSecondary)),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              height: 44,
+              child: FilledButton(
+                key: const Key('continue-training'),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => ActiveTrainingScreen(session: widget.session, day: activeDay)),
+                ),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: AppTheme.textOnPrimary,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusFull)),
+                ),
+                child: const Text('CONTINUAR TREINO'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AchievementList extends StatelessWidget {
+  const _AchievementList({required this.sessions, required this.weeklyTarget});
+  final List<TrainingSession> sessions;
+  final int weeklyTarget;
+
+  @override
+  Widget build(BuildContext context) {
+    final list = TrainingStats.achievements(sessions, weeklyTarget: weeklyTarget);
+    return GridView.count(
+      crossAxisCount: 3,
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 0.95,
+      children: [for (final a in list) AchievementCard(achievement: a)],
+    );
+  }
 }
 
 class _EmptyTraining extends StatelessWidget {
-  const _EmptyTraining({required this.onCreate});
-  final VoidCallback onCreate;
+  const _EmptyTraining();
   @override
   Widget build(BuildContext context) {
     return Center(
@@ -325,20 +547,26 @@ class _EmptyTraining extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Container(width: 72, height: 72, decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)), child: const Icon(Icons.fitness_center, size: 32, color: AppTheme.primary)),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(color: AppTheme.primary.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
+              child: const Icon(Icons.fitness_center, size: 32, color: AppTheme.primary),
+            ),
             const SizedBox(height: 16),
-            Text('Nenhum treino criado', style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+            Text('Você ainda não possui um treino cadastrado', textAlign: TextAlign.center, style: GoogleFonts.spaceGrotesk(fontSize: 18, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
             const SizedBox(height: 8),
             Text('Monte sua rotina e deixe o registro\nda academia muito mais rápido.', textAlign: TextAlign.center, style: GoogleFonts.inter(fontSize: 13, color: AppTheme.textSecondary, height: 1.4)),
             const SizedBox(height: 20),
-            FilledButton.icon(onPressed: onCreate, icon: const Icon(Icons.add, size: 18), label: Text('Criar treino', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700))),
+            FilledButton.icon(
+              key: const Key('create-training'),
+              onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const TrainingEditor())),
+              icon: const Icon(Icons.add, size: 18),
+              label: Text('Criar treino', style: GoogleFonts.spaceGrotesk(fontWeight: FontWeight.w700)),
+            ),
           ],
         ),
       ),
     );
   }
-}
-
-extension<T> on List<T> {
-  T? get firstOrNull => isEmpty ? null : first;
 }

@@ -46,6 +46,16 @@ class _TrainingEditorState extends State<TrainingEditor> {
                   Row(
                     children: [
                       Expanded(child: Text(_days[i].name, style: GoogleFonts.inter(fontWeight: FontWeight.w700))),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_upward, size: 16),
+                        tooltip: 'Mover para cima',
+                        onPressed: i == 0 ? null : () => _moveDay(i, -1),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_downward, size: 16),
+                        tooltip: 'Mover para baixo',
+                        onPressed: i == _days.length - 1 ? null : () => _moveDay(i, 1),
+                      ),
                       IconButton(icon: const Icon(Icons.edit_outlined, size: 18), onPressed: () => _editDay(i)),
                       IconButton(icon: const Icon(Icons.delete_outline, size: 18, color: AppTheme.danger), onPressed: () => setState(() => _days.removeAt(i))),
                     ],
@@ -91,6 +101,15 @@ class _TrainingEditorState extends State<TrainingEditor> {
       builder: (_) => _DayDialog(initial: _days[index]),
     );
     if (result != null) setState(() => _days[index] = result);
+  }
+
+  /// Reordena as divisões da ficha.
+  void _moveDay(int index, int delta) {
+    setState(() {
+      final target = index + delta;
+      final day = _days.removeAt(index);
+      _days.insert(target, day);
+    });
   }
 
   Future<void> _save() async {
@@ -163,12 +182,31 @@ class _DayDialogState extends State<_DayDialog> {
               const SizedBox(height: 12),
               TextField(controller: _time, decoration: const InputDecoration(labelText: 'Horário', hintText: '19:00')),
               const SizedBox(height: 16),
-              ..._exs.map((ex) => ListTile(
-                    dense: true,
-                    title: Text(ex.name, style: GoogleFonts.inter(fontSize: 12)),
-                    subtitle: Text('${ex.sets}×${ex.repsLabel} ${ex.loadKg.round()}kg', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textMuted)),
-                    trailing: IconButton(icon: const Icon(Icons.close, size: 16), onPressed: () => setState(() => _exs.remove(ex))),
-                  )),
+              ..._exs.asMap().entries.map((entry) {
+                final i = entry.key;
+                final ex = entry.value;
+                return ListTile(
+                  dense: true,
+                  title: Text(ex.name, style: GoogleFonts.inter(fontSize: 12)),
+                  subtitle: Text('${ex.sets}×${ex.repsLabel} ${ex.loadKg.round()}kg', style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textMuted)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.arrow_upward, size: 15),
+                        tooltip: 'Mover para cima',
+                        onPressed: i == 0 ? null : () => setState(() => _exs.insert(i - 1, _exs.removeAt(i))),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.arrow_downward, size: 15),
+                        tooltip: 'Mover para baixo',
+                        onPressed: i == _exs.length - 1 ? null : () => setState(() => _exs.insert(i + 1, _exs.removeAt(i))),
+                      ),
+                      IconButton(icon: const Icon(Icons.close, size: 16), tooltip: 'Remover', onPressed: () => setState(() => _exs.removeAt(i))),
+                    ],
+                  ),
+                );
+              }),
               OutlinedButton.icon(onPressed: _addExercise, icon: const Icon(Icons.add, size: 16), label: const Text('Adicionar exercício')),
             ],
           ),

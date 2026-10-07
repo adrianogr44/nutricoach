@@ -421,6 +421,14 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Torna [id] o plano de treino ativo (troca de plano na aba Treino).
+  Future<void> setActiveTrainingPlan(String id) async {
+    if (!_trainingPlans.any((p) => p.id == id)) return;
+    _activeTrainingPlanId = id;
+    _persistTraining();
+    notifyListeners();
+  }
+
   Future<TrainingDay> addTrainingDay(String planId, {required String name, int? weekday, String? time}) async {
     final pIdx = _trainingPlans.indexWhere((p) => p.id == planId);
     if (pIdx < 0) throw StateError('Plano não encontrado');
