@@ -129,6 +129,62 @@ Future<void> _settle(WidgetTester tester) async {
   await tester.pump(const Duration(milliseconds: 350));
 }
 
+/// Dia longo (8 exercícios × 4 séries, descanso de 90s) — como a ficha real
+/// importada no celular.
+Map<String, Object> _seedLongDay() => {
+      'training_plans': jsonEncode([
+        {
+          'id': 'p1',
+          'name': 'Força A',
+          'isActive': true,
+          'days': [
+            {
+              'id': 'd1',
+              'name': 'A - Treino longo',
+              'exercises': [
+                for (var i = 1; i <= 8; i++)
+                  {
+                    'id': 'e$i',
+                    'name': 'Exercício $i',
+                    'sets': 4,
+                    'repsMin': 8,
+                    'repsMax': 12,
+                    'loadKg': 40,
+                    'restSeconds': 90,
+                  },
+              ],
+            },
+            {
+              'id': 'd2',
+              'name': 'B - Segundo dia',
+              'exercises': [
+                {'id': 'e9', 'name': 'Remada', 'sets': 2, 'repsMin': 8, 'repsMax': 10, 'loadKg': 50, 'restSeconds': 0},
+              ],
+            },
+          ],
+        },
+      ]),
+      'active_training_plan_id': 'p1',
+      'training_sessions': '[]',
+    };
+
+/// Pupa a home em viewport mobile (390×844) para expor overflows reais.
+Future<void> _pumpHomeMobile(WidgetTester tester, AppState state) async {
+  tester.view.physicalSize = const Size(390, 844);
+  tester.view.devicePixelRatio = 1;
+  addTearDown(tester.view.reset);
+  await tester.pumpWidget(
+    ChangeNotifierProvider<AppState>.value(
+      value: state,
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: const TrainingHomeScreen(),
+      ),
+    ),
+  );
+  await tester.pump();
+}
+
 // ─────────────────────────── testes ───────────────────────────
 
 void main() {
@@ -158,6 +214,8 @@ void main() {
     final state = await _state(_seedPlan());
     await _pumpHome(tester, state);
 
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('start-training')));
     await _settle(tester);
 
@@ -171,6 +229,8 @@ void main() {
     final state = await _state(_seedPlan());
     await _pumpHome(tester, state);
 
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('start-training')));
     await _settle(tester);
 
@@ -204,6 +264,8 @@ void main() {
     final state = await _state(_seedPlan());
     await _pumpHome(tester, state);
 
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('start-training')));
     await _settle(tester);
 
@@ -256,6 +318,8 @@ void main() {
     final state = await _state(_seedPlan());
     await _pumpHome(tester, state);
 
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
     await tester.tap(find.byKey(const Key('start-training')));
     await _settle(tester);
 
@@ -387,5 +451,186 @@ void main() {
     expect(find.text('Você tem apenas um plano de treino.'), findsOneWidget);
     expect(find.text('Trocar plano'), findsNothing);
     expect(state.activeTrainingPlan?.id, 'p1');
+  });
+
+  // ─────────────── mobile390×844: descanso, overflow e expansão ───────────────
+
+  testWidgets('mobile: com descanso ativo a última série não fica atrás da barra', (tester) async {
+    final state = await _state(_seedLongDay());
+    await _pumpHomeMobile(tester, state);
+
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('start-training')));
+    await _settle(tester);
+
+    // Registra a série 1 do primeiro exercício → descanso de 90s.
+    await tester.enterText(find.byKey(const Key('set-kg-e1-1')), '40');
+    await tester.enterText(find.byKey(const Key('set-reps-e1-1')), '8');
+    await tester.tap(find.byKey(const Key('set-confirm-e1-1')));
+    await _settle(tester);
+    expect(find.byKey(const Key('rest-timer')), findsOneWidget);
+
+    // Rola até o último exercício entrar na área renderizada.
+    final list = find.byType(ListView);
+    for (var i = 0; i < 8 && find.text('EXERCÍCIO 8').evaluate().isEmpty; i++) {
+      await tester.drag(list, const Offset(0, -800));
+      await _settle(tester);
+    }
+    final lastHeader = find.text('EXERCÍCIO 8');
+    expect(lastHeader, findsOneWidget);
+    await tester.ensureVisible(lastHeader);
+    await tester.pump();
+    // O último exercício precisa ser clicável mesmo com a barra na tela.
+    expect(lastHeader.hitTestable(), findsOneWidget);
+    await tester.tap(lastHeader);
+    await _settle(tester);
+    await tester.drag(list, const Offset(0, -2500));
+    await _settle(tester);
+    await tester.drag(list, const Offset(0, -2500));
+    await _settle(tester);
+
+    final confirm = find.byKey(const Key('set-confirm-e8-1'));
+    expect(confirm, findsOneWidget);
+    // Precisa ser clicável de verdade — sem ficar sob a barra de descanso.
+    expect(confirm.hitTestable(), findsOneWidget);
+  });
+
+  testWidgets('mobile: finalizar o treino com a barra de descanso ativa', (tester) async {
+    final state = await _state(_seedLongDay());
+    await _pumpHomeMobile(tester, state);
+
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('start-training')));
+    await _settle(tester);
+    await tester.enterText(find.byKey(const Key('set-kg-e1-1')), '40');
+    await tester.enterText(find.byKey(const Key('set-reps-e1-1')), '8');
+    await tester.tap(find.byKey(const Key('set-confirm-e1-1')));
+    await _settle(tester);
+    expect(find.byKey(const Key('rest-timer')), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(TextButton, 'Finalizar'));
+    await _settle(tester);
+    expect(find.text('Finalizar treino?'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Finalizar'));
+    await _settle(tester);
+    expect(state.trainingSessions.first.status, TrainingStatus.completed);
+    expect(find.text('TREINO CONCLUÍDO'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Concluir'));
+    await _settle(tester);
+    expect(state.activeTrainingSession, isNull);
+  });
+
+  testWidgets('mobile: a home não tem overflow de layout a 390px', (tester) async {
+    final state = await _state(_seedPlan());
+    await _pumpHomeMobile(tester, state);
+    await _settle(tester);
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile: a barra de descanso não tem overflow a 390px', (tester) async {
+    final state = await _state(_seedLongDay());
+    await _pumpHomeMobile(tester, state);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('start-training')));
+    await _settle(tester);
+    expect(tester.takeException(), isNull);
+
+    await tester.enterText(find.byKey(const Key('set-kg-e1-1')), '40');
+    await tester.enterText(find.byKey(const Key('set-reps-e1-1')), '8');
+    await tester.tap(find.byKey(const Key('set-confirm-e1-1')));
+    await _settle(tester);
+    expect(find.byKey(const Key('rest-timer')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('mobile: a home não tem overflow a 360px (Android estreito)', (tester) async {
+    final state = await _state(_seedLongDay());
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    await tester.pumpWidget(
+      ChangeNotifierProvider<AppState>.value(
+        value: state,
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const TrainingHomeScreen(),
+        ),
+      ),
+    );
+    await tester.pump();
+    await _settle(tester);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('start-training')));
+    await _settle(tester);
+    await tester.enterText(find.byKey(const Key('set-kg-e1-1')), '40');
+    await tester.enterText(find.byKey(const Key('set-reps-e1-1')), '8');
+    await tester.tap(find.byKey(const Key('set-confirm-e1-1')));
+    await _settle(tester);
+    expect(find.byKey(const Key('rest-timer')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('card do dia expande os exercícios e recolhe no segundo toque', (tester) async {
+    final state = await _state(_seedPlan());
+    await _pumpHome(tester, state);
+
+    // Card do dia selecionado já vem expandido.
+    expect(find.byKey(const Key('division-exercises-0')), findsOneWidget);
+    expect(find.textContaining('2 × 8–10'), findsOneWidget);
+    expect(find.textContaining('40 kg'), findsOneWidget);
+
+    await tester.tap(find.byKey(const Key('division-card-0')));
+    await _settle(tester);
+    expect(find.byKey(const Key('division-exercises-0')), findsNothing);
+
+    await tester.tap(find.byKey(const Key('division-card-0')));
+    await _settle(tester);
+    expect(find.byKey(const Key('division-exercises-0')), findsOneWidget);
+    expect(find.textContaining('Sem exercícios cadastrados'), findsNothing);
+  });
+
+  testWidgets('selecionar outro dia expande o card e cria a sessão naquele dia', (tester) async {
+    final state = await _state(_seedPlan());
+    await _pumpHome(tester, state);
+
+    await tester.tap(find.byKey(const Key('division-card-1')));
+    await _settle(tester);
+    expect(find.byKey(const Key('division-exercises-1')), findsOneWidget);
+    expect(find.textContaining('Remada curvada · 2 × 8–10'), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('start-training')));
+    await tester.pump();
+    await tester.tap(find.byKey(const Key('start-training')));
+    await _settle(tester);
+    expect(state.trainingSessions.single.dayId, 'd2');
+    expect(find.byKey(const Key('exercise-e3')), findsOneWidget);
+  });
+
+  testWidgets('regressão: na tela de execução o card do exercício reabre a série', (tester) async {
+    final state = await _state(_seedWithSession(_activeSession()));
+    await _pumpHome(tester, state);
+
+    await tester.tap(find.byKey(const Key('continue-training')));
+    await _settle(tester);
+    expect(find.byKey(const Key('set-confirm-e2-1')), findsOneWidget);
+
+    await tester.tap(find.text('TRÍCEPS CORDA'));
+    await _settle(tester);
+    expect(find.byKey(const Key('set-confirm-e2-1')), findsNothing);
+
+    await tester.tap(find.text('TRÍCEPS CORDA'));
+    await _settle(tester);
+    expect(find.byKey(const Key('set-confirm-e2-1')), findsOneWidget);
   });
 }

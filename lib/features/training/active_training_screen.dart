@@ -209,23 +209,32 @@ class _ActiveTrainingScreenState extends State<ActiveTrainingScreen> {
                 ),
                 const SizedBox(height: 16),
                 Expanded(
-                  child: ListView(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-                    children: [
-                      Text('EXERCÍCIOS', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                      const SizedBox(height: 10),
-                      for (var i = 0; i < day.exercises.length; i++)
-                        _ExerciseWorkoutCard(
-                          key: ValueKey('exercise-${day.exercises[i].id}'),
-                          exercise: day.exercises[i],
-                          index: i,
-                          session: session,
-                          allSessions: state.trainingSessions,
-                          totalOf: day.exercises.length,
-                          defaultOpen: day.exercises[i].id == firstPendingId,
-                          onRegister: (w, r) => _registerSet(day.exercises[i], w, r),
-                        ),
-                    ],
+                  child: ValueListenableBuilder<int>(
+                    valueListenable: _restLeft,
+                    builder: (context, rest, child) => AnimatedPadding(
+                      duration: const Duration(milliseconds: 200),
+                      curve: Curves.easeOut,
+                      padding: EdgeInsets.only(bottom: rest > 0 ? 100 : 0),
+                      child: child,
+                    ),
+                    child: ListView(
+                      padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+                      children: [
+                        Text('EXERCÍCIOS', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 1)),
+                        const SizedBox(height: 10),
+                        for (var i = 0; i < day.exercises.length; i++)
+                          _ExerciseWorkoutCard(
+                            key: ValueKey('exercise-${day.exercises[i].id}'),
+                            exercise: day.exercises[i],
+                            index: i,
+                            session: session,
+                            allSessions: state.trainingSessions,
+                            totalOf: day.exercises.length,
+                            defaultOpen: day.exercises[i].id == firstPendingId,
+                            onRegister: (w, r) => _registerSet(day.exercises[i], w, r),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
               ],

@@ -694,8 +694,10 @@ class _ActiveBannerState extends State<_ActiveBanner> {
               children: [
                 const Icon(Icons.fitness_center, size: 16, color: AppTheme.primary),
                 const SizedBox(width: 8),
-                Text('TREINO EM ANDAMENTO', style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.primary, letterSpacing: 1)),
-                const Spacer(),
+                Expanded(
+                  child: Text('TREINO EM ANDAMENTO', overflow: TextOverflow.ellipsis, style: GoogleFonts.jetBrainsMono(fontSize: 10, fontWeight: FontWeight.w800, color: AppTheme.primary, letterSpacing: 1)),
+                ),
+                const SizedBox(width: 8),
                 Text('$mm:$ss', style: GoogleFonts.jetBrainsMono(fontSize: 14, fontWeight: FontWeight.w800, color: AppTheme.primary)),
               ],
             ),
