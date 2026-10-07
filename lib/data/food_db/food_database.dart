@@ -3,11 +3,13 @@ import 'taco_foods.dart';
 
 /// Banco de alimentos baseado na Tabela Brasileira de Composição de
 /// Alimentos (TACO 4ª ed., NEPA/UNICAMP) — tabela completa (597 alimentos,
-/// [taco_foods.dart]) — além de itens curados com porções padrão e sinônimos.
+/// [taco_foods.dart]) — além de itens curados com porções padrão e sinônimos
+/// e produtos específicos cadastrados a partir do rótulo do fabricante.
 ///
 /// Valores por 100 g de alimento pronto para consumo.
 /// REGRA CRÍTICA: a IA NUNCA calcula nutrientes. Todo valor nutricional
-/// registrado no app vem deste banco ou de fonte externa validada.
+/// registrado no app vem deste banco ou de fonte externa validada
+/// (TACO/TBCA, rótulo do produto ou OpenFoodFacts).
 class FoodDatabase {
   FoodDatabase._();
 
@@ -47,29 +49,23 @@ class FoodDatabase {
     final scored = <(Food, int)>[];
     for (final f in _foods) {
       final name = _normalize(f.name.toLowerCase());
+      // Melhor pontuação do nome (1000 exato / 500 prefixo / 300 trecho)...
+      var best = 0;
       if (name == q) {
-        scored.add((f, 1000));
-        continue;
+        best = 1000;
+      } else if (name.startsWith(q)) {
+        best = 500;
+      } else if (name.contains(q)) {
+        best = 300;
       }
-      if (name.startsWith(q)) {
-        scored.add((f, 500));
-        continue;
-      }
-      if (name.contains(q)) {
-        scored.add((f, 300));
-        continue;
-      }
+      // ...comparada com a dos aliases (600 alias exato / 250 alias contém),
+      // para que um sinônimo exato sempre vença um nome apenas parecido.
       for (final a in f.aliases) {
         final al = _normalize(a.toLowerCase());
-        if (al == q) {
-          scored.add((f, 600));
-          break;
-        }
-        if (al.contains(q)) {
-          scored.add((f, 250));
-          break;
-        }
+        final score = al == q ? 600 : (al.contains(q) ? 250 : 0);
+        if (score > best) best = score;
       }
+      if (best > 0) scored.add((f, best));
     }
     scored.sort((a, b) => b.$2.compareTo(a.$2));
     return scored.take(limit).map((e) => e.$1).toList();
@@ -109,6 +105,7 @@ class FoodDatabase {
     double portion = 100,
     List<String> aliases = const [],
     String source = 'TACO/TBCA',
+    String? brand,
   }) {
     return Food(
       id: id,
@@ -123,6 +120,7 @@ class FoodDatabase {
       standardPortionGrams: portion,
       aliases: aliases,
       source: source,
+      brand: brand,
     );
   }
 
@@ -141,7 +139,7 @@ class FoodDatabase {
       _f('pao-branco', 'Pão branco', 'Pães e torradas', 268, 8.0, 54.0, 3.2,
           fiber: 1.9, sodium: 500, portion: 50, aliases: ['pao de sanduiche']),
       _f('aveia', 'Aveia em flocos', 'Cereais e grãos', 394, 13.9, 66.6, 8.5,
-          fiber: 9.1, sodium: 11, portion: 40, aliases: ['aveia em flocos', 'farinha de aveia']),
+          fiber: 9.1, sodium: 11, portion: 40, aliases: ['aveia', 'aveia em flocos', 'farinha de aveia']),
       _f('macarrao', 'Macarrão cozido', 'Cereais e grãos', 112, 3.5, 21.8, 1.1,
           fiber: 1.5, sodium: 3, portion: 200, aliases: ['massa cozida', 'espaguete', 'miojo sem tempero']),
       _f('farinha-mandioca', 'Farinha de mandioca', 'Cereais e grãos', 361, 1.6, 87.9, 0.3,
@@ -157,7 +155,7 @@ class FoodDatabase {
 
       // ───────────── LEGUMINOSAS ─────────────
       _f('feijao-carioca', 'Feijão carioca cozido', 'Leguminosas', 76, 4.8, 13.6, 0.5,
-          fiber: 8.5, sodium: 244, portion: 130, aliases: ['feijao', 'feijao cozido', 'feijao carioca', 'feijao preto']),
+          fiber: 8.5, sodium: 244, portion: 130, aliases: ['feijao', 'feijao cozido', 'feijao carioca']),
       _f('feijao-preto', 'Feijão preto cozido', 'Leguminosas', 77, 4.5, 14.0, 0.5,
           fiber: 8.4, sodium: 218, portion: 130, aliases: ['feijao preto']),
       _f('lentilha', 'Lentilha cozida', 'Leguminosas', 93, 6.3, 16.3, 0.5,
@@ -219,7 +217,7 @@ class FoodDatabase {
       _f('camarao', 'Camarão cozido', 'Peixes e frutos do mar', 99, 20.5, 0.3, 1.6,
           sodium: 187, portion: 100, aliases: ['camarao']),
       _f('ovo', 'Ovo de galinha cozido', 'Ovos', 146, 13.3, 0.6, 9.5,
-          sodium: 136, portion: 50, aliases: ['ovo cozido', 'ovo']),
+          sodium: 136, portion: 50, aliases: ['ovo cozido', 'ovo', 'ovo inteiro', 'ovo de galinha inteiro']),
       _f('ovo-frito', 'Ovo frito', 'Ovos', 240, 15.6, 1.2, 18.6,
           sodium: 171, portion: 50, aliases: ['ovo frito', 'ovo estrelado']),
       _f('ovo-mexido', 'Ovo mexido', 'Ovos', 145, 13.2, 1.2, 9.6,
@@ -410,6 +408,52 @@ class FoodDatabase {
           fiber: 3.8, sodium: 310, portion: 200, aliases: ['virado']),
       _f('acai-xarope', 'Açaí com xarope e guaraná', 'Pratos prontos', 119, 0.6, 19.4, 4.6,
           fiber: 1.2, sodium: 2, portion: 100, aliases: ['acai', 'acai na tigela']),
+
+      // ───────────── SUPLEMENTOS (rótulo do produto / sem composição) ─────────────
+      // Valores por 100 g derivados do rótulo: 30 g = 105 kcal, 21 g P,
+      // 4,8 g C, 0,3 g G, 54 mg sódio → ×100/30.
+      _f(
+        'dark-whey-protein-concentrate',
+        'Whey Protein Concentrate — Dark Supplements',
+        'Suplementos',
+        350,
+        70,
+        16,
+        1,
+        fiber: 0,
+        sodium: 180,
+        portion: 30,
+        aliases: [
+          'whey',
+          'whey protein',
+          'whey protein concentrate',
+          'wpc',
+          'dark whey',
+          'dark supplements whey',
+          'whey dark',
+          'proteina whey',
+          'proteína whey',
+          'proteina do soro do leite',
+          'suplemento proteico',
+          'whey concentrado',
+        ],
+        source: 'Rótulo do produto — Dark Supplements Whey Protein Concentrate',
+        brand: 'Dark Supplements',
+      ),
+      // Sem tabela de composição disponível: 0 kcal e 0 g de macros não são
+      // valores inventados, mas a ausência de nutrientes energéticos declarados.
+      _f(
+        'creatina-monohidratada',
+        'Creatina monohidratada',
+        'Suplementos',
+        0,
+        0,
+        0,
+        0,
+        portion: 5,
+        aliases: ['creatina', 'creatina monohidratada', 'creatine', 'creatine monohydrate'],
+        source: 'Suplemento sem fonte de composição — Creatina monohidratada (0 kcal e 0 g de macros)',
+      ),
     ];
   }
 }
