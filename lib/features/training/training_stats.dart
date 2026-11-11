@@ -129,6 +129,26 @@ class TrainingStats {
     return const [];
   }
 
+  /// Séries planejadas e registradas da sessão (indicador do treino em andamento).
+  static ({int done, int total}) setsProgress(TrainingSession session, TrainingDay day) {
+    var done = 0;
+    var total = 0;
+    for (final ex in day.exercises) {
+      total += ex.sets;
+      final count = setsFor(session, ex.id).length;
+      done += count > ex.sets ? ex.sets : count;
+    }
+    return (done: done, total: total);
+  }
+
+  /// Índice do primeiro exercício com séries pendentes (-1 = todos concluídos).
+  static int firstPendingIndex(TrainingSession session, TrainingDay day) {
+    for (var i = 0; i < day.exercises.length; i++) {
+      if (setsFor(session, day.exercises[i].id).length < day.exercises[i].sets) return i;
+    }
+    return -1;
+  }
+
   /// Último desempenho do exercício: séries registradas na sessão anterior
   /// mais recente que tenha registro. [currentSessionId] é excluído para
   /// nunca devolver a própria sessão em andamento. Lista vazia = primeira vez.

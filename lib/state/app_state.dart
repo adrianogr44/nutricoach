@@ -595,6 +595,29 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Substitui uma série já registrada (edição antes de finalizar o treino).
+  /// Mantém a posição da série na lista e o formato persistido.
+  Future<void> replaceSetInSession(
+    String sessionId,
+    String exerciseId,
+    int index,
+    TrainingSet set,
+  ) async {
+    final sIdx = _trainingSessions.indexWhere((s) => s.id == sessionId);
+    if (sIdx < 0) return;
+    final session = _trainingSessions[sIdx];
+    final exIdx = session.exercises.indexWhere((e) => e.exerciseId == exerciseId);
+    if (exIdx < 0) return;
+    final sets = [...session.exercises[exIdx].sets];
+    if (index < 0 || index >= sets.length) return;
+    sets[index] = set;
+    final exSessions = [...session.exercises];
+    exSessions[exIdx] = session.exercises[exIdx].copyWith(sets: sets);
+    _trainingSessions[sIdx] = session.copyWith(exercises: exSessions);
+    _persistTraining();
+    notifyListeners();
+  }
+
   Future<void> finishTrainingSession(String sessionId) async {
     final sIdx = _trainingSessions.indexWhere((s) => s.id == sessionId);
     if (sIdx < 0) return;

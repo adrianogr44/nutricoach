@@ -1,14 +1,12 @@
-import 'dart:async';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 import '../../core/theme/app_theme.dart';
 import '../../data/models/training.dart';
+import '../../widgets/core_widgets.dart';
 import 'training_stats.dart';
 
-/// Bloco de resumo superior — sequência, recorde, treinos e semana.
+/// Bloco de resumo semanal — leitura rápida, sem competir com o treino do dia.
 class TrainingSummaryCard extends StatelessWidget {
   const TrainingSummaryCard({
     super.key,
@@ -28,61 +26,74 @@ class TrainingSummaryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Semantics(
-      label: 'Sequência de $streak dias, recorde de $best, $total treinos concluídos, '
+      label:
+          'Sequência de $streak dias, recorde de $best, $total treinos concluídos, '
           '$weekDone de $weekTarget esta semana',
       child: Container(
         key: const Key('summary-card'),
-        padding: const EdgeInsets.all(18),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
         decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppTheme.surface, AppTheme.surfaceLight],
-          ),
+          color: AppTheme.surface,
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
           border: Border.all(color: AppTheme.border, width: 0.8),
-          boxShadow: AppTheme.shadowSubtle,
         ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Wrap(
+          spacing: 26,
+          runSpacing: 14,
+          crossAxisAlignment: WrapCrossAlignment.end,
           children: [
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text('SEQUÊNCIA', style: GoogleFonts.jetBrainsMono(fontSize: 10, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                      const SizedBox(height: 6),
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.baseline,
-                        textBaseline: TextBaseline.alphabetic,
-                        children: [
-                          Text(streak.toString().padLeft(2, '0'), style: GoogleFonts.spaceGrotesk(fontSize: 46, fontWeight: FontWeight.w800, color: AppTheme.primary, letterSpacing: -2, height: 0.9)),
-                          const SizedBox(width: 6),
-                          Text(streak == 1 ? 'dia' : 'dias', style: GoogleFonts.jetBrainsMono(fontSize: 12, color: AppTheme.textSecondary)),
-                        ],
-                      ),
-                    ],
+                Text(
+                  'SEQUÊNCIA',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 10,
+                    color: AppTheme.textMuted,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 1,
                   ),
                 ),
-                _MiniStat(label: 'RECORDE', value: best.toString().padLeft(2, '0')),
+                const SizedBox(height: 4),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.baseline,
+                  textBaseline: TextBaseline.alphabetic,
+                  children: [
+                    Text(
+                      streak.toString().padLeft(2, '0'),
+                      style: GoogleFonts.spaceGrotesk(
+                        fontSize: 34,
+                        fontWeight: FontWeight.w800,
+                        color: AppTheme.primary,
+                        letterSpacing: -1.5,
+                        height: 1,
+                      ),
+                    ),
+                    const SizedBox(width: 5),
+                    Text(
+                      streak == 1 ? 'dia' : 'dias',
+                      style: GoogleFonts.inter(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ],
             ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(child: _BarStat(label: 'TREINOS', value: total.toString().padLeft(2, '0'))),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: _BarStat(
-                    label: 'SEMANA',
-                    value: '$weekDone/$weekTarget',
-                    color: weekDone >= weekTarget && weekTarget > 0 ? AppTheme.primary : AppTheme.textPrimary,
-                  ),
-                ),
-              ],
+            _SummaryStat(
+              label: 'SEMANA',
+              value: '$weekDone/$weekTarget',
+              highlight: weekTarget > 0 && weekDone >= weekTarget,
+            ),
+            _SummaryStat(
+              label: 'TREINOS',
+              value: total.toString().padLeft(2, '0'),
+            ),
+            _SummaryStat(
+              label: 'RECORDE',
+              value: best.toString().padLeft(2, '0'),
             ),
           ],
         ),
@@ -91,53 +102,48 @@ class TrainingSummaryCard extends StatelessWidget {
   }
 }
 
-class _MiniStat extends StatelessWidget {
-  const _MiniStat({required this.label, required this.value});
+class _SummaryStat extends StatelessWidget {
+  const _SummaryStat({
+    required this.label,
+    required this.value,
+    this.highlight = false,
+  });
   final String label;
   final String value;
+  final bool highlight;
+
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Text(label, style: GoogleFonts.jetBrainsMono(fontSize: 9, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 1)),
+        Text(
+          label,
+          style: GoogleFonts.jetBrainsMono(
+            fontSize: 10,
+            color: AppTheme.textMuted,
+            fontWeight: FontWeight.w700,
+            letterSpacing: 1,
+          ),
+        ),
         const SizedBox(height: 4),
-        Text(value, style: GoogleFonts.spaceGrotesk(fontSize: 20, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
+        Text(
+          value,
+          style: GoogleFonts.jetBrainsMono(
+            fontSize: 20,
+            fontWeight: FontWeight.w800,
+            color: highlight ? AppTheme.primary : AppTheme.textPrimary,
+          ),
+        ),
       ],
     );
   }
 }
 
-class _BarStat extends StatelessWidget {
-  const _BarStat({required this.label, required this.value, this.color = AppTheme.textPrimary});
-  final String label;
-  final String value;
-  final Color color;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppTheme.backgroundElevated,
-        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-        border: Border.all(color: AppTheme.border, width: 0.8),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(label, style: GoogleFonts.jetBrainsMono(fontSize: 9, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 1)),
-          Text(value, style: GoogleFonts.jetBrainsMono(fontSize: 14, fontWeight: FontWeight.w800, color: color)),
-        ],
-      ),
-    );
-  }
-}
-
-/// Card de divisão (A/B/C, Push/Pull/Legs...). O identificador é derivado
-/// da posição no plano ou de uma letra única já usada no nome do dia.
-/// Um toque seleciona o dia e expande a lista de exercícios; tocar de
-/// novo recolhe.
-class TrainingDivisionCard extends StatefulWidget {
+/// Chip compacto de divisão (A/B/C). Seleciona o dia; o detalhe dos
+/// exercícios fica na lista abaixo.
+class TrainingDivisionCard extends StatelessWidget {
   const TrainingDivisionCard({
     super.key,
     required this.day,
@@ -145,7 +151,6 @@ class TrainingDivisionCard extends StatefulWidget {
     required this.isToday,
     required this.isActive,
     required this.onTap,
-    this.lastLabel,
   });
 
   final TrainingDay day;
@@ -153,7 +158,6 @@ class TrainingDivisionCard extends StatefulWidget {
   final bool isToday;
   final bool isActive;
   final VoidCallback onTap;
-  final String? lastLabel;
 
   static String letterFor(TrainingDay day, int index) {
     final name = day.name.trim();
@@ -165,124 +169,84 @@ class TrainingDivisionCard extends StatefulWidget {
   }
 
   @override
-  State<TrainingDivisionCard> createState() => _TrainingDivisionCardState();
-}
-
-class _TrainingDivisionCardState extends State<TrainingDivisionCard> {
-  late bool _open;
-
-  @override
-  void initState() {
-    super.initState();
-    _open = widget.isActive;
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final day = widget.day;
-    final letter = TrainingDivisionCard.letterFor(day, widget.index);
-    final selected = widget.isActive || widget.isToday;
-    final borderColor = selected ? AppTheme.primary : AppTheme.border;
+    final letter = letterFor(day, index);
+    final selected = isActive;
     return Semantics(
       button: true,
-      label: 'Treino $letter, ${day.name}, ${day.totalExercises} exercícios${widget.isToday ? ', treino de hoje' : ''}',
+      selected: selected,
+      label:
+          'Treino $letter, ${day.name}, ${day.totalExercises} exercícios'
+          '${isToday ? ', treino de hoje' : ''}',
       child: Material(
         color: Colors.transparent,
         child: InkWell(
-          key: Key('division-card-${widget.index}'),
-          onTap: () {
-            widget.onTap();
-            setState(() => _open = !_open);
-          },
-          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          key: Key('division-card-$index'),
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(AppTheme.radiusSm),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 180),
-            padding: const EdgeInsets.all(14),
+            duration: const Duration(milliseconds: 160),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
               color: selected ? AppTheme.primaryMuted : AppTheme.surface,
-              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              border: Border.all(color: borderColor, width: selected ? 1.4 : 0.8),
-              boxShadow: widget.isToday ? [const BoxShadow(color: Color(0x2200E6A0), blurRadius: 18, spreadRadius: -2)] : null,
+              borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+              border: Border.all(
+                color: selected ? AppTheme.primary : AppTheme.border,
+                width: selected ? 1.4 : 0.8,
+              ),
             ),
-            child: Column(
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Row(
-                  children: [
-                    Container(
-                      width: 46,
-                      height: 46,
-                      alignment: Alignment.center,
-                      decoration: BoxDecoration(
-                        color: widget.isToday ? AppTheme.primary : AppTheme.surfaceLight,
-                        borderRadius: BorderRadius.circular(AppTheme.radiusXs),
-                        border: Border.all(color: widget.isToday ? AppTheme.primary : AppTheme.border, width: 0.8),
-                      ),
-                      child: Text(letter, style: GoogleFonts.spaceGrotesk(fontSize: 22, fontWeight: FontWeight.w800, color: widget.isToday ? AppTheme.textOnPrimary : AppTheme.textPrimary)),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Flexible(
-                                child: Text(day.name, overflow: TextOverflow.ellipsis, style: GoogleFonts.spaceGrotesk(fontSize: 15, fontWeight: FontWeight.w700, color: AppTheme.textPrimary)),
-                              ),
-                              if (widget.isToday) ...[
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-                                  decoration: BoxDecoration(color: AppTheme.primary, borderRadius: BorderRadius.circular(999)),
-                                  child: Text('HOJE', style: GoogleFonts.jetBrainsMono(fontSize: 9, fontWeight: FontWeight.w800, color: AppTheme.textOnPrimary, letterSpacing: 0.6)),
-                                ),
-                              ],
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '${day.totalExercises} exercícios · ${day.totalSets} séries'
-                            '${widget.lastLabel != null ? ' · ${widget.lastLabel}' : ''}',
-                            style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textSecondary),
-                          ),
-                        ],
-                      ),
-                    ),
-                    Icon(_open ? Icons.expand_less_rounded : Icons.expand_more_rounded, size: 22, color: selected ? AppTheme.primary : AppTheme.textMuted),
-                  ],
+                Text(
+                  letter,
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: selected ? AppTheme.primary : AppTheme.textPrimary,
+                  ),
                 ),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 180),
-                  curve: Curves.easeOut,
-                  alignment: Alignment.topCenter,
-                  child: _open
-                      ? Container(
-                          key: Key('division-exercises-${widget.index}'),
-                          width: double.infinity,
-                          margin: const EdgeInsets.only(top: 10),
-                          padding: const EdgeInsets.only(top: 8),
-                          decoration: BoxDecoration(
-                            border: Border(top: BorderSide(color: AppTheme.border, width: 0.6)),
-                          ),
-                          child: day.exercises.isEmpty
-                              ? Text('Sem exercícios cadastrados', style: GoogleFonts.inter(fontSize: 12, color: AppTheme.textMuted))
-                              : Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    for (var i = 0; i < day.exercises.length; i++)
-                                      Padding(
-                                        padding: const EdgeInsets.only(bottom: 4),
-                                        child: Text(
-                                          '${(i + 1).toString().padLeft(2, '0')}  ${day.exercises[i].name} · ${day.exercises[i].sets} × ${day.exercises[i].repsLabel}'
-                                          '${day.exercises[i].loadKg > 0 ? ' · ${day.exercises[i].loadKg.round()} kg' : ''}',
-                                          style: GoogleFonts.jetBrainsMono(fontSize: 11, color: AppTheme.textSecondary),
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                        )
-                      : const SizedBox.shrink(),
+                const SizedBox(width: 10),
+                ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 150),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        day.emphasis,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: selected
+                              ? AppTheme.textPrimary
+                              : AppTheme.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        '${day.totalExercises} ex · ${day.totalSets} séries',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 10,
+                          color: AppTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
+                if (isToday) ...[
+                  const SizedBox(width: 8),
+                  Container(
+                    width: 6,
+                    height: 6,
+                    decoration: const BoxDecoration(
+                      color: AppTheme.primary,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -292,9 +256,539 @@ class _TrainingDivisionCardState extends State<TrainingDivisionCard> {
   }
 }
 
+/// Destaque do treino selecionado: letra, ênfase, volume e ação principal.
+class TrainingHeroCard extends StatelessWidget {
+  const TrainingHeroCard({
+    super.key,
+    required this.day,
+    required this.letter,
+    required this.isToday,
+    required this.exerciseCount,
+    required this.setCount,
+    required this.estimatedMinutes,
+    required this.doneExercises,
+    required this.active,
+    required this.onStart,
+    this.lastLabel,
+  });
+
+  final TrainingDay day;
+  final String letter;
+  final bool isToday;
+  final int exerciseCount;
+  final int setCount;
+  final int? estimatedMinutes;
+  final int doneExercises;
+  final bool active;
+  final VoidCallback onStart;
+  final String? lastLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final total = exerciseCount == 0 ? 1 : exerciseCount;
+    final fraction = (doneExercises / total).clamp(0.0, 1.0);
+
+    return Semantics(
+      label:
+          '${isToday ? 'Treino de hoje' : 'Treino selecionado'}: ${day.name}. '
+          '$exerciseCount exercícios, $setCount séries.',
+      child: Container(
+        key: const Key('training-hero'),
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppTheme.surfaceLight, AppTheme.surface],
+          ),
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          border: Border.all(color: AppTheme.borderStrong, width: 0.8),
+          boxShadow: AppTheme.shadowSubtle,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  ),
+                  child: Text(
+                    letter,
+                    style: GoogleFonts.spaceGrotesk(
+                      fontSize: 26,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.textOnPrimary,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            isToday ? 'TREINO DE HOJE' : 'DIVISÃO SELECIONADA',
+                            style: GoogleFonts.jetBrainsMono(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w800,
+                              color: AppTheme.primary,
+                              letterSpacing: 1,
+                            ),
+                          ),
+                          if (lastLabel != null) ...[
+                            const SizedBox(width: 8),
+                            Flexible(
+                              child: Text(
+                                lastLabel!,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: GoogleFonts.inter(
+                                  fontSize: 11,
+                                  color: AppTheme.textMuted,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        day.name,
+                        style: GoogleFonts.spaceGrotesk(
+                          fontSize: 21,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.textPrimary,
+                          height: 1.15,
+                          letterSpacing: -0.4,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        day.emphasis,
+                        style: GoogleFonts.inter(
+                          fontSize: 13.5,
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _HeroPill(
+                  icon: Icons.fitness_center,
+                  label: '$exerciseCount exercícios',
+                ),
+                _HeroPill(
+                  icon: Icons.repeat_rounded,
+                  label: '$setCount séries',
+                ),
+                if (estimatedMinutes != null)
+                  _HeroPill(
+                    icon: Icons.schedule,
+                    label: '~$estimatedMinutes min',
+                  ),
+              ],
+            ),
+            if (active) ...[
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Expanded(
+                    child: GradientBar(
+                      progress: fraction,
+                      color: AppTheme.primary,
+                      height: 6,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    '$doneExercises/$exerciseCount',
+                    style: GoogleFonts.jetBrainsMono(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: FilledButton.icon(
+                key: const Key('start-training'),
+                onPressed: exerciseCount == 0 ? null : onStart,
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppTheme.primary,
+                  foregroundColor: AppTheme.textOnPrimary,
+                  disabledBackgroundColor: AppTheme.surfaceHover,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                  ),
+                ),
+                icon: Icon(
+                  active ? Icons.play_arrow_rounded : Icons.bolt_rounded,
+                  size: 22,
+                ),
+                label: Text(
+                  active ? 'CONTINUAR TREINO' : 'INICIAR TREINO',
+                  style: GoogleFonts.spaceGrotesk(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 0.6,
+                  ),
+                ),
+              ),
+            ),
+            if (exerciseCount == 0) ...[
+              const SizedBox(height: 8),
+              Text(
+                'Este dia ainda não tem exercícios. Edite a ficha para adicionar.',
+                style: GoogleFonts.inter(
+                  fontSize: 12,
+                  color: AppTheme.textMuted,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HeroPill extends StatelessWidget {
+  const _HeroPill({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundElevated,
+        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+        border: Border.all(color: AppTheme.border, width: 0.8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: AppTheme.textSecondary),
+          const SizedBox(width: 6),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 12.5,
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Card compacto de exercício na home: número, nome, séries × reps e status.
+/// Toque para expandir detalhes (carga sugerida, descanso, orientações).
+class ExerciseListCard extends StatefulWidget {
+  const ExerciseListCard({
+    super.key,
+    required this.exercise,
+    required this.index,
+    this.doneSets = 0,
+    this.tracking = false,
+    this.lastLabel,
+  });
+
+  final ExerciseDef exercise;
+  final int index;
+
+  /// Séries registradas na sessão ativa (0 quando não há sessão).
+  final int doneSets;
+
+  /// `true` quando há sessão em andamento para este dia.
+  final bool tracking;
+  final String? lastLabel;
+
+  @override
+  State<ExerciseListCard> createState() => _ExerciseListCardState();
+}
+
+class _ExerciseListCardState extends State<ExerciseListCard> {
+  bool _open = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final exercise = widget.exercise;
+    final completed = widget.tracking && widget.doneSets >= exercise.sets;
+    final inProgress = widget.tracking && widget.doneSets > 0 && !completed;
+    final accent = completed
+        ? AppTheme.primary
+        : (inProgress ? AppTheme.primarySoft : AppTheme.textMuted);
+
+    return Container(
+      key: Key('exercise-card-${exercise.id}'),
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: completed
+            ? AppTheme.primaryMuted.withValues(alpha: 0.45)
+            : AppTheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+        border: Border.all(
+          color: completed || inProgress
+              ? AppTheme.primary.withValues(alpha: 0.55)
+              : AppTheme.border,
+          width: completed || inProgress ? 1.2 : 0.8,
+        ),
+      ),
+      child: Column(
+        children: [
+          InkWell(
+            borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+            onTap: () => setState(() => _open = !_open),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+              child: Row(
+                children: [
+                  Container(
+                    width: 30,
+                    height: 30,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppTheme.backgroundElevated,
+                      borderRadius: BorderRadius.circular(AppTheme.radiusXs),
+                      border: Border.all(color: AppTheme.border, width: 0.8),
+                    ),
+                    child: Text(
+                      (widget.index + 1).toString().padLeft(2, '0'),
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 11.5,
+                        fontWeight: FontWeight.w700,
+                        color: accent,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          exercise.name,
+                          style: GoogleFonts.inter(
+                            fontSize: 14.5,
+                            height: 1.25,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 3),
+                        Text(
+                          '${exercise.sets} séries · ${exercise.repsLabel} reps'
+                          '${exercise.loadKg > 0 ? ' · ${exercise.loadKg.toStringAsFixed(0)} kg' : ''}',
+                          style: GoogleFonts.jetBrainsMono(
+                            fontSize: 11,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  if (completed)
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 20,
+                      color: AppTheme.primary,
+                    )
+                  else if (inProgress)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryMuted,
+                        borderRadius: BorderRadius.circular(
+                          AppTheme.radiusFull,
+                        ),
+                      ),
+                      child: Text(
+                        '${widget.doneSets}/${exercise.sets}',
+                        style: GoogleFonts.jetBrainsMono(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppTheme.primary,
+                        ),
+                      ),
+                    )
+                  else
+                    Icon(
+                      _open
+                          ? Icons.expand_less_rounded
+                          : Icons.expand_more_rounded,
+                      size: 20,
+                      color: AppTheme.textMuted,
+                    ),
+                ],
+              ),
+            ),
+          ),
+          if (_open)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(14, 0, 14, 14),
+              decoration: const BoxDecoration(
+                border: Border(
+                  top: BorderSide(color: AppTheme.border, width: 0.8),
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: [
+                      if (exercise.muscleGroup != null &&
+                          exercise.muscleGroup!.isNotEmpty)
+                        _DetailChip(
+                          icon: Icons.accessibility_new,
+                          label: exercise.muscleGroup!,
+                        ),
+                      _DetailChip(
+                        icon: Icons.timer_outlined,
+                        label: '${exercise.restSeconds}s descanso',
+                      ),
+                      _DetailChip(
+                        icon: Icons.repeat_rounded,
+                        label: '${exercise.repsMin}–${exercise.repsMax} reps',
+                      ),
+                    ],
+                  ),
+                  if (widget.lastLabel != null) ...[
+                    const SizedBox(height: 10),
+                    Text(
+                      'Última vez: ${widget.lastLabel!}',
+                      style: GoogleFonts.jetBrainsMono(
+                        fontSize: 11.5,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                  if (exercise.notes != null &&
+                      exercise.notes!.trim().isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Icon(
+                          Icons.lightbulb_outline,
+                          size: 15,
+                          color: AppTheme.primary,
+                        ),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            exercise.notes!,
+                            style: GoogleFonts.inter(
+                              fontSize: 12.5,
+                              color: AppTheme.textSecondary,
+                              height: 1.45,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                  if (exercise.videoUrl != null &&
+                      exercise.videoUrl!.isNotEmpty) ...[
+                    const SizedBox(height: 10),
+                    Row(
+                      children: [
+                        const Icon(
+                          Icons.play_circle_outline,
+                          size: 15,
+                          color: AppTheme.textMuted,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          'Vídeo demonstrativo disponível no treino',
+                          style: GoogleFonts.inter(
+                            fontSize: 12,
+                            color: AppTheme.textMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _DetailChip extends StatelessWidget {
+  const _DetailChip({required this.icon, required this.label});
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppTheme.backgroundElevated,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXs),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 13, color: AppTheme.textMuted),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: GoogleFonts.inter(
+              fontSize: 11.5,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Grid de consistência — janela de [weeks] semanas civis, só sessões reais.
 class ConsistencyGrid extends StatelessWidget {
-  const ConsistencyGrid({super.key, required this.sessions, this.weeks = 12, this.now});
+  const ConsistencyGrid({
+    super.key,
+    required this.sessions,
+    this.weeks = 12,
+    this.now,
+  });
 
   final List<TrainingSession> sessions;
   final int weeks;
@@ -302,17 +796,26 @@ class ConsistencyGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final grid = TrainingStats.consistencyGrid(sessions, weeks: weeks, now: now);
-    final trained = grid.expand((c) => c).where((c) => c == TrainingDayCell.trained).length;
+    final grid = TrainingStats.consistencyGrid(
+      sessions,
+      weeks: weeks,
+      now: now,
+    );
+    final trained = grid
+        .expand((c) => c)
+        .where((c) => c == TrainingDayCell.trained)
+        .length;
     return Semantics(
-      label: 'Consistência: $trained dias com treino nas últimas $weeks semanas',
+      label:
+          'Consistência: $trained dias com treino nas últimas $weeks semanas',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           LayoutBuilder(
             builder: (context, constraints) {
               const gap = 3.0;
-              final size = ((constraints.maxWidth - gap * (weeks - 1)) / weeks).clamp(6.0, 16.0);
+              final size = ((constraints.maxWidth - gap * (weeks - 1)) / weeks)
+                  .clamp(6.0, 16.0);
               return Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -329,10 +832,16 @@ class ConsistencyGrid extends StatelessWidget {
                                 color: switch (cell) {
                                   TrainingDayCell.trained => AppTheme.primary,
                                   TrainingDayCell.rest => AppTheme.surfaceHover,
-                                  TrainingDayCell.future => AppTheme.backgroundElevated,
+                                  TrainingDayCell.future =>
+                                    AppTheme.backgroundElevated,
                                 },
                                 borderRadius: BorderRadius.circular(3),
-                                border: cell == TrainingDayCell.future ? Border.all(color: AppTheme.border, width: 0.6) : null,
+                                border: cell == TrainingDayCell.future
+                                    ? Border.all(
+                                        color: AppTheme.border,
+                                        width: 0.6,
+                                      )
+                                    : null,
                               ),
                             ),
                           ),
@@ -349,7 +858,11 @@ class ConsistencyGrid extends StatelessWidget {
             children: [
               _LegendDot(color: AppTheme.primary, label: 'Treino'),
               _LegendDot(color: AppTheme.surfaceHover, label: 'Descanso'),
-              _LegendDot(color: AppTheme.backgroundElevated, label: 'Ainda não ocorreu', outlined: true),
+              _LegendDot(
+                color: AppTheme.backgroundElevated,
+                label: 'Ainda não ocorreu',
+                outlined: true,
+              ),
             ],
           ),
         ],
@@ -359,7 +872,11 @@ class ConsistencyGrid extends StatelessWidget {
 }
 
 class _LegendDot extends StatelessWidget {
-  const _LegendDot({required this.color, required this.label, this.outlined = false});
+  const _LegendDot({
+    required this.color,
+    required this.label,
+    this.outlined = false,
+  });
   final Color color;
   final String label;
   final bool outlined;
@@ -374,11 +891,16 @@ class _LegendDot extends StatelessWidget {
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(2),
-            border: outlined ? Border.all(color: AppTheme.border, width: 0.6) : null,
+            border: outlined
+                ? Border.all(color: AppTheme.border, width: 0.6)
+                : null,
           ),
         ),
         const SizedBox(width: 5),
-        Text(label, style: GoogleFonts.inter(fontSize: 10, color: AppTheme.textMuted)),
+        Text(
+          label,
+          style: GoogleFonts.inter(fontSize: 10.5, color: AppTheme.textMuted),
+        ),
       ],
     );
   }
@@ -401,20 +923,44 @@ class AchievementCard extends StatelessWidget {
         decoration: BoxDecoration(
           color: unlocked ? AppTheme.primaryMuted : AppTheme.surface,
           borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-          border: Border.all(color: unlocked ? AppTheme.primary.withValues(alpha: 0.4) : AppTheme.border, width: 0.8),
+          border: Border.all(
+            color: unlocked
+                ? AppTheme.primary.withValues(alpha: 0.4)
+                : AppTheme.border,
+            width: 0.8,
+          ),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(unlocked ? Icons.emoji_events_rounded : Icons.lock_outline, size: 18, color: color),
+            Icon(
+              unlocked ? Icons.emoji_events_rounded : Icons.lock_outline,
+              size: 18,
+              color: color,
+            ),
             const SizedBox(height: 8),
-            Text(achievement.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w700, color: unlocked ? AppTheme.textPrimary : AppTheme.textMuted)),
+            Text(
+              achievement.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: GoogleFonts.inter(
+                fontSize: 12,
+                height: 1.2,
+                fontWeight: FontWeight.w700,
+                color: unlocked ? AppTheme.textPrimary : AppTheme.textMuted,
+              ),
+            ),
             const SizedBox(height: 2),
             Text(
-              unlocked ? achievement.detail : '${achievement.progress}/${achievement.target}',
+              unlocked
+                  ? achievement.detail
+                  : '${achievement.progress}/${achievement.target}',
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: GoogleFonts.jetBrainsMono(fontSize: 10, color: unlocked ? AppTheme.primary : AppTheme.textFaint),
+              style: GoogleFonts.jetBrainsMono(
+                fontSize: 10,
+                color: unlocked ? AppTheme.primary : AppTheme.textFaint,
+              ),
             ),
           ],
         ),
@@ -423,123 +969,137 @@ class AchievementCard extends StatelessWidget {
   }
 }
 
-/// Barra de descanso — flutuante na parte inferior da sessão ativa.
-/// O timer vive aqui (rebuilda só a si mesma); a tela é notificada por
-/// [onFinished] quando o descanso zera.
-class RestTimerBar extends StatefulWidget {
+/// Painel de descanso — flutuante, com contagem regressiva e progresso.
+/// Puramente visual: o cronômetro (um único intervalo) vive na tela de
+/// execução, então a contagem continua correta mesmo com rebuilds.
+class RestTimerBar extends StatelessWidget {
   const RestTimerBar({
     super.key,
-    required this.listenable,
+    required this.seconds,
     required this.onAdjust,
     required this.onSkip,
-    required this.onFinished,
+    this.totalSeconds,
   });
 
-  final ValueListenable<int> listenable;
+  final int seconds;
   final ValueChanged<int> onAdjust;
   final VoidCallback onSkip;
-  final VoidCallback onFinished;
-
-  @override
-  State<RestTimerBar> createState() => _RestTimerBarState();
-}
-
-class _RestTimerBarState extends State<RestTimerBar> {
-  Timer? _timer;
-
-  @override
-  void initState() {
-    super.initState();
-    widget.listenable.addListener(_onChange);
-    _sync();
-  }
-
-  @override
-  void didUpdateWidget(covariant RestTimerBar old) {
-    super.didUpdateWidget(old);
-    if (old.listenable != widget.listenable) {
-      old.listenable.removeListener(_onChange);
-      widget.listenable.addListener(_onChange);
-      _sync();
-    }
-  }
-
-  @override
-  void dispose() {
-    widget.listenable.removeListener(_onChange);
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  void _onChange() {
-    _sync();
-    setState(() {});
-  }
-
-  void _sync() {
-    _timer?.cancel();
-    _timer = null;
-    if (widget.listenable.value <= 0) return;
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (widget.listenable.value <= 1) {
-        t.cancel();
-        widget.onFinished();
-      } else {
-        widget.onAdjust(-1);
-      }
-    });
-  }
+  final int? totalSeconds;
 
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<int>(
-      valueListenable: widget.listenable,
-      builder: (context, seconds, _) {
-        if (seconds <= 0) return const SizedBox.shrink();
-        final mm = (seconds ~/ 60).toString().padLeft(2, '0');
-        final ss = (seconds % 60).toString().padLeft(2, '0');
-        return SafeArea(
-          top: false,
-          child: Container(
-            key: const Key('rest-timer'),
-            margin: const EdgeInsets.fromLTRB(10, 0, 10, 12),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppTheme.surfaceLight,
-              borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-              border: Border.all(color: AppTheme.primary.withValues(alpha: 0.4), width: 1),
-              boxShadow: const [BoxShadow(color: Color(0x33000000), blurRadius: 16)],
+    if (seconds <= 0) return const SizedBox.shrink();
+    final total = (totalSeconds ?? seconds) <= 0
+        ? seconds
+        : (totalSeconds ?? seconds);
+    final mm = (seconds ~/ 60).toString().padLeft(2, '0');
+    final ss = (seconds % 60).toString().padLeft(2, '0');
+    return SafeArea(
+      top: false,
+      minimum: const EdgeInsets.only(bottom: 4),
+      child: Container(
+        key: const Key('rest-timer'),
+        margin: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
+        decoration: BoxDecoration(
+          color: AppTheme.surfaceLight,
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+          border: Border.all(
+            color: AppTheme.primary.withValues(alpha: 0.5),
+            width: 1,
+          ),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x55000000),
+              blurRadius: 18,
+              offset: Offset(0, 6),
             ),
-            child: Row(
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('DESCANSO', style: GoogleFonts.jetBrainsMono(fontSize: 8, color: AppTheme.textMuted, fontWeight: FontWeight.w700, letterSpacing: 1)),
-                    Text('$mm:$ss', style: GoogleFonts.jetBrainsMono(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.primary, height: 1.1)),
-                  ],
+                Text(
+                  'DESCANSO',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 10,
+                    color: AppTheme.textMuted,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1,
+                  ),
                 ),
                 const Spacer(),
-                _RestButton(label: '-15', onTap: () => widget.onAdjust(-15)),
-                const SizedBox(width: 6),
-                _RestButton(label: '+15', onTap: () => widget.onAdjust(15)),
-                const SizedBox(width: 6),
-                _RestButton(label: 'Pular', onTap: widget.onSkip, wide: true),
+                Text(
+                  '$mm:$ss',
+                  style: GoogleFonts.jetBrainsMono(
+                    fontSize: 30,
+                    fontWeight: FontWeight.w800,
+                    color: AppTheme.primary,
+                    height: 1,
+                    letterSpacing: -1,
+                  ),
+                ),
               ],
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 10),
+            GradientBar(
+              progress: total <= 0 ? 0 : seconds / total,
+              color: AppTheme.primary,
+              height: 5,
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _RestButton(label: '−15s', onTap: () => onAdjust(-15)),
+                const SizedBox(width: 8),
+                _RestButton(label: '+15s', onTap: () => onAdjust(15)),
+                const Spacer(),
+                Semantics(
+                  button: true,
+                  label: 'Pular descanso',
+                  child: SizedBox(
+                    height: 44,
+                    child: FilledButton(
+                      key: const Key('skip-rest'),
+                      onPressed: onSkip,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: AppTheme.primaryMuted,
+                        foregroundColor: AppTheme.primary,
+                        minimumSize: const Size(0, 44),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(
+                            AppTheme.radiusFull,
+                          ),
+                        ),
+                      ),
+                      child: Text(
+                        'Pular',
+                        style: GoogleFonts.inter(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class _RestButton extends StatelessWidget {
-  const _RestButton({required this.label, required this.onTap, this.wide = false});
+  const _RestButton({required this.label, required this.onTap});
   final String label;
   final VoidCallback onTap;
-  final bool wide;
   @override
   Widget build(BuildContext context) {
     return SizedBox(
@@ -547,13 +1107,21 @@ class _RestButton extends StatelessWidget {
       child: TextButton(
         onPressed: onTap,
         style: TextButton.styleFrom(
-          padding: EdgeInsets.symmetric(horizontal: wide ? 12 : 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           foregroundColor: AppTheme.textPrimary,
           backgroundColor: AppTheme.surfaceHover,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusXs)),
-          minimumSize: const Size(44, 44),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+          ),
+          minimumSize: const Size(52, 44),
         ),
-        child: Text(label, style: GoogleFonts.jetBrainsMono(fontSize: 12, fontWeight: FontWeight.w700)),
+        child: Text(
+          label,
+          style: GoogleFonts.jetBrainsMono(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       ),
     );
   }

@@ -112,7 +112,7 @@ O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto co
 | **Código de barras** | `features/meals/barcode_screen.dart` | `FoodDatabase.byBarcode` → fallback `OpenFoodFactsApi` |
 | **OCR rótulo** | `features/meals/nutrition_label_screen.dart` | `DeviceTextRecognizer` → `NutritionLabelTextParser` → revisão humana → salvar |
 | **Dieta** | `features/diet/diet_screen.dart` + `diet_meal_editor.dart` | cria planos, refeições, itens (unidade caseira→gramas), totais, status do dia |
-| **Treino** | `features/training/{training_home,training_editor,active_training_screen}.dart` | planos semanais, dias, exercícios, sessão ativa (séries, descanso, progressão) |
+| **Treino** | `features/training/{training_home,active_training_screen,exercise_video,training_widgets,training_stats,training_history_view,training_editor}.dart` | abas internas Hoje/Ficha/Histórico; destaque do dia com letra, ênfase, volume, progresso e CTA única; chips de divisão; lista de exercícios compacta e expansível; execução focada em 1 exercício (vídeo 16:9 ou placeholder, orientações, tabela de séries editável, botão grande "Concluir série", descanso com cronômetro único, navegação entre exercícios e finalização com resumo) |
 | **Academia manual** | `features/workout/workout_screen.dart` | kcal + tempo + obs → `addWorkout` |
 | **Peso / Medidas** | `weight_screen.dart`, `measurements_screen.dart` | `WeightRecord` (upsert por dia), `BodyMeasurement` |
 | **Metas** | `features/metas/metas_screen.dart` | TMB/TDEE/IMC/metas e edição do perfil |
@@ -143,7 +143,7 @@ O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto co
 `logDietMeal` grava um `Meal` com `rawText: 'Dieta:<id>:<nome>'` (é assim que o dashboard sabe o que já foi registrado).
 
 **Treino**
-`createTrainingPlan` · `updateTrainingPlan` · `deleteTrainingPlan` · `addTrainingDay` · `updateTrainingDay` · `removeTrainingDay` · `addExerciseToDay` · `startTrainingSession(planId, dayId)` (cria `TrainingSession` + `Workout(source:'training')` com `kcalBurned: 0`) · `addSetToSession` · `finishTrainingSession` · `sessionsForDay`.
+`createTrainingPlan` · `updateTrainingPlan` · `deleteTrainingPlan` · `addTrainingDay` · `updateTrainingDay` · `removeTrainingDay` · `addExerciseToDay` · `startTrainingSession(planId, dayId)` (cria `TrainingSession` + `Workout(source:'training')` com `kcalBurned: 0`) · `addSetToSession` · `replaceSetInSession(sessionId, exerciseId, index, set)` (edição antes de finalizar) · `finishTrainingSession` · `sessionsForDay`.
 
 **Corpo/registo**
 `saveProfile` · `updateProfilePhoto(base64)` · `computeGoals(base)` (só preenche metas nulas) · `addWeight` (upsert por dia) · `addMeasurement` · `addPhoto`/`removePhoto` · `addWorkout`/`removeWorkout` · `addWater(date, ml)`/`waterFor(date)` · `isFavorite`/`toggleFavorite` · `addCustomFood` · `allSearchableFoods(query, {limit: 40})` · `importBioimpedance(bio)` (dedup por data, salva peso, cria/atualiza perfil, usa `bio.tmbKcal` se > 0) · `setUserEmail` · `setStatus`.
@@ -159,7 +159,7 @@ O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto co
 - **`tracking.dart`**: `Workout(id, date, kcalBurned, source)` · `WaterRecord(date, amountMl)`.
 - **`body_track.dart`**: `WeightRecord(date, weightKg)` · `MeasureType` · `BodyMeasurement` · `ProgressPhoto`.
 - **`diet.dart`**: `DietMealItem(foodId, quantity, unit, customGramsPerUnit?, foodSnapshot)` · `DietMeal(id, name, time?, order, items)` · `DietPlan(id, name, meals, createdAt, updatedAt, isActive)`.
-- **`training.dart`**: `ExerciseDef`, `TrainingDay`, `TrainingPlan`, `TrainingSession`, `TrainingSet`, `ExerciseSession`, `TrainingStatus {active, completed}`.
+- **`training.dart`**: `ExerciseDef` (`videoUrl`, `thumbnailUrl` e `notes` opcionais), `TrainingDay` (getter `emphasis`), `TrainingPlan`, `TrainingSession`, `TrainingSet`, `ExerciseSession`, `TrainingStatus {active, completed}`.
 - **`bioimpedance.dart`**: `Bioimpedance(data, pesoKg?, alturaCm?, idade?, imc?, gorduraPct?, gorduraKg?, massaMuscularKg?, massaMuscularEsqueleticaKg?, aguaL?, proteinaKg?, mineraisKg?, tmbKcal?, gorduraVisceral?, grauObesidade?, relacaoCinturaQuadril?, pesoIdealKg?, pontuacao?, massaMagraSegmentar?, gorduraSegmentar?, fonte, sexo?)` · `SegmentalValues(rightArm?, leftArm?, trunk?, rightLeg?, leftLeg? + sufixos Pct)` para massa magra e gordura por segmento.
 - **`device_health.dart`**: `DailyStepsRecord`, `DeviceWorkoutSession`, `SleepSessionRecord`, `HeartRateRecord`, `HealthIntegrationConfig`, `HealthSyncHistory`, `HealthDataSource`.
 
@@ -250,14 +250,38 @@ Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (títulos/U
 3. **Rótulo OCR**: `NutritionLabelScreen` → ML Kit → `NutritionLabelTextParser` → `toFood` → revisão → salvar.
 4. **Código de barras**: `BarcodeScreen` → `FoodDatabase.byBarcode` → fallback `OpenFoodFactsApi`.
 5. **Dieta → dia**: `logDietMeal` converte itens p/ gramas, aplica seleção/override/substituição do dia, infere `MealType` pelo nome e grava `Meal` com `rawText: 'Dieta:<id>:<nome>'`.
-6. **Treino**: `startTrainingSession` cria sessão + `Workout(source:'training')` → `addSetToSession` → `finishTrainingSession`.
+6. **Treino**: `startTrainingSession` cria sessão + `Workout(source:'training')` → `addSetToSession`/`replaceSetInSession` → `finishTrainingSession`.
 7. **Insights**: `summaryFor` → `daily/weekly/checkIn` → dashboard (`_InsightInline`), histórico, coach (com rota de ação) e check-in.
+
+### 13.1 Área de treino (interface reformulada)
+
+**Abas internas** (`TrainingHomeScreen`, sem aba global nova): **Hoje**, **Ficha** e **Histórico** (`tab-hoje`, `tab-ficha`, `tab-historico`).
+
+**Hoje**
+- Cabeçalho `TREINO` + nome do plano, com ações de histórico, editar ficha e trocar plano.
+- `TrainingHeroCard` (`training-hero`): letra da divisão, nome, ênfase muscular (grupos dos exercícios ou complemento do nome), nº de exercícios, séries, duração estimada (quando cadastrada), progresso e CTA única `start-training` ("INICIAR/CONTINUAR TREINO").
+- Chips de divisão (`division-card-N`) selecionam o dia sem sair da tela.
+- Lista compacta (`ExerciseListCard`, `exercise-card-<id>`): número, nome, séries × reps × carga, status (pendente/em andamento/concluído) e expansão com músculo, descanso, última carga e orientações.
+- `TrainingSummaryCard`, `ConsistencyGrid` e conquistas aparecem abaixo, em leitura secundária.
+- Sessão em andamento de outro dia aparece no banner `active-session-banner`; nunca é criada uma segunda sessão ativa.
+
+**Execução** (`ActiveTrainingScreen`)
+- Cabeçalho com letra + nome do dia, `Finalizar` e progresso `exercícios concluídos / total` com percentual, séries e cronômetro total.
+- Um exercício por vez (`previous-exercise` / `next-exercise`), com `ExerciseVideo` em 16:9 (thumbnail + "Assistir demonstração" quando há `videoUrl`; placeholder elegante quando não há), nome, grupo, reps, descanso e orientações (`ExerciseDef.notes`).
+- Tabela de séries: série atual destacada, campos de carga/reps, concluídas com check e lápis para editar (`set-edit-N`); chaves `set-kg-<ex>-N`, `set-reps-<ex>-N` e `set-confirm-<ex>-N`.
+- Botão fixo `primary-action` (60 px): "CONCLUIR SÉRIE N" → "PRÓXIMO EXERCÍCIO" → "FINALIZAR TREINO" (e "SALVAR SÉRIE N" durante a edição).
+- Descanso (`rest-timer`): painel com contagem, barra de progresso, −15 s/+15 s e "Pular"; um único `Timer` baseado em deadline, então a contagem não duplica nem reinicia a cada rebuild.
+- Finalização com confirmação quando há séries pendentes e resumo (duração, exercícios, séries, volume).
+
+**Vídeos**: `ExerciseDef.videoUrl` e `ExerciseDef.thumbnailUrl` são opcionais — fichas antigas continuam válidas. Editáveis em `training_editor.dart` e abertos no app/browser via `url_launcher`. Sem URL, o espaço 16:9 mostra placeholder e não quebra o layout.
+
+**Dados**: `TrainingPlan/TrainingDay/ExerciseDef` e `TrainingSession/ExerciseSession/TrainingSet` preservados. `AppState.replaceSetInSession` corrige uma série antes de finalizar. `TrainingStats` calcula progresso por exercício/série (`sessionProgress`, `setsProgress`), ênfase (`TrainingDay.emphasis`) e volume.
 
 ---
 
 ## 14. Testes, qualidade e deploy
 
-- **Testes** (`test/`, 25 arquivos, 309 casos passando): banco TACO/cálculos/`DailySummary.status`, `MealTextParser`, `InsightRulesEngine`, `HouseholdMeasureConverter`/`DietPlan`, parser de bioimpedância (aliases, números, segmentar, histórico × atual, faixas de referência, data, modelo/JSON, entrada por JSON e diálogo), revisão editável, integração com a saúde (serviço falso), parsers de rótulo/OFF, `FoodDataUpdater`, copy das telas ("sem chat", "Sem IA generativa"), regressões de UI (`dashboard_hoje_regression_test`, `home_shell_fab_test`).
+- **Testes** (`test/`, 26 arquivos, 316 casos passando): banco TACO/cálculos/`DailySummary.status`, `MealTextParser`, `InsightRulesEngine`, `HouseholdMeasureConverter`/`DietPlan`, parser de bioimpedância (aliases, números, segmentar, histórico × atual, faixas de referência, data, modelo/JSON, entrada por JSON e diálogo), revisão editável, integração com a saúde (serviço falso), parsers de rótulo/OFF, `FoodDataUpdater`, copy das telas ("sem chat", "Sem IA generativa"), área de treino (home/execução, descanso, edição de série, overflow 360/390 px, vídeo no modelo e no arquivo exportado) e regressões de UI (`dashboard_hoje_regression_test`, `home_shell_fab_test`).
 - **Qualidade**: `flutter analyze` (só infos/warnings pré-existentes) · `flutter test` determinístico (SharedPreferences mockado).
 - **Deploy site**: `flutter build web --release` → `npx vercel build --prod` → `npx vercel deploy --prebuilt --prod --yes`. Produção: `https://nutricoachai-wheat.vercel.app`. O push ao GitHub **não** dispara build na Vercel (`Ignored Build Step = exit 0`), de propósito — a Vercel não compila Flutter.
 - **Local**: `flutter run` / `flutter run -d chrome` / `serve.py` (porta 8080).
@@ -275,6 +299,8 @@ Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (títulos/U
 - Atualização remota do banco (`FoodDataUpdater`) não plugada no app.
 - OCR indisponível em web/desktop (só Android/iOS).
 - `Workout` criado por sessão de treino entra com `kcalBurned: 0` (kcal vem do registro manual).
+- Treino: vídeos são links (`videoUrl`) abertos no app/browser — não há player embutido nem vídeos versionados no repositório. Sem URL, a área 16:9 mostra placeholder.
+- Treino: o app não cria uma segunda sessão ativa; para trocar de treino é preciso finalizar o atual (o banner permite continuar o que está em andamento).
 - Sem CI/CD (`.github/` inexistente).
 
 ---

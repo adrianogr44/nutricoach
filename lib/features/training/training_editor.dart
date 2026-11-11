@@ -246,6 +246,9 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
   final _repsMax = TextEditingController(text: '12');
   final _load = TextEditingController(text: '55');
   final _rest = TextEditingController(text: '90');
+  final _notes = TextEditingController();
+  final _video = TextEditingController();
+  final _thumb = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -271,6 +274,47 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
               const SizedBox(width: 8),
               Expanded(child: TextField(controller: _rest, decoration: const InputDecoration(labelText: 'Descanso s'), keyboardType: TextInputType.number)),
             ]),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _notes,
+              maxLines: 2,
+              minLines: 1,
+              decoration: const InputDecoration(
+                labelText: 'Orientações (opcional)',
+                hintText: 'Ex.: escápulas retraídas, descer em 2s',
+              ),
+            ),
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'VÍDEO DEMONSTRATIVO (OPCIONAL)',
+                style: GoogleFonts.jetBrainsMono(
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textMuted,
+                  letterSpacing: 1,
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _video,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'URL do vídeo',
+                hintText: 'https://youtube.com/watch?v=...',
+              ),
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _thumb,
+              keyboardType: TextInputType.url,
+              decoration: const InputDecoration(
+                labelText: 'URL da capa (opcional)',
+                hintText: 'https://.../thumb.jpg',
+              ),
+            ),
           ],
         ),
       ),
@@ -286,6 +330,9 @@ class _ExerciseDialogState extends State<_ExerciseDialog> {
               repsMax: int.tryParse(_repsMax.text) ?? 12,
               loadKg: double.tryParse(_load.text.replaceAll(',', '.')) ?? 0,
               restSeconds: int.tryParse(_rest.text) ?? 90,
+              notes: _notes.text.trim().isEmpty ? null : _notes.text.trim(),
+              videoUrl: _video.text.trim().isEmpty ? null : _video.text.trim(),
+              thumbnailUrl: _thumb.text.trim().isEmpty ? null : _thumb.text.trim(),
             );
             Navigator.pop(context, ex);
           },

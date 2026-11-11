@@ -11,6 +11,8 @@ class ExerciseDef {
     this.restSeconds = 90,
     this.notes,
     this.order = 0,
+    this.videoUrl,
+    this.thumbnailUrl,
   });
 
   final String id;
@@ -21,8 +23,15 @@ class ExerciseDef {
   final int repsMax;
   final double loadKg;
   final int restSeconds;
+
+  /// Orientações de execução exibidas durante o treino.
   final String? notes;
   final int order;
+
+  /// Vídeo demonstrativo (YouTube ou arquivo direto) e capa opcional.
+  /// Campos opcionais: fichas antigas continuam válidas sem eles.
+  final String? videoUrl;
+  final String? thumbnailUrl;
 
   String get repsLabel => repsMin == repsMax ? '$repsMin' : '$repsMin–$repsMax';
 
@@ -37,6 +46,8 @@ class ExerciseDef {
         'restSeconds': restSeconds,
         'notes': notes,
         'order': order,
+        'videoUrl': videoUrl,
+        'thumbnailUrl': thumbnailUrl,
       };
 
   factory ExerciseDef.fromJson(Map<String, dynamic> json) => ExerciseDef(
@@ -50,10 +61,37 @@ class ExerciseDef {
         restSeconds: (json['restSeconds'] as num?)?.toInt() ?? 90,
         notes: json['notes'] as String?,
         order: (json['order'] as num?)?.toInt() ?? 0,
+        videoUrl: json['videoUrl'] as String?,
+        thumbnailUrl: json['thumbnailUrl'] as String?,
       );
 
-  ExerciseDef copyWith({String? name, String? muscleGroup, int? sets, int? repsMin, int? repsMax, double? loadKg, int? restSeconds, String? notes, int? order}) {
-    return ExerciseDef(id: id, name: name ?? this.name, muscleGroup: muscleGroup ?? this.muscleGroup, sets: sets ?? this.sets, repsMin: repsMin ?? this.repsMin, repsMax: repsMax ?? this.repsMax, loadKg: loadKg ?? this.loadKg, restSeconds: restSeconds ?? this.restSeconds, notes: notes ?? this.notes, order: order ?? this.order);
+  ExerciseDef copyWith({
+    String? name,
+    String? muscleGroup,
+    int? sets,
+    int? repsMin,
+    int? repsMax,
+    double? loadKg,
+    int? restSeconds,
+    String? notes,
+    int? order,
+    String? videoUrl,
+    String? thumbnailUrl,
+  }) {
+    return ExerciseDef(
+      id: id,
+      name: name ?? this.name,
+      muscleGroup: muscleGroup ?? this.muscleGroup,
+      sets: sets ?? this.sets,
+      repsMin: repsMin ?? this.repsMin,
+      repsMax: repsMax ?? this.repsMax,
+      loadKg: loadKg ?? this.loadKg,
+      restSeconds: restSeconds ?? this.restSeconds,
+      notes: notes ?? this.notes,
+      order: order ?? this.order,
+      videoUrl: videoUrl ?? this.videoUrl,
+      thumbnailUrl: thumbnailUrl ?? this.thumbnailUrl,
+    );
   }
 }
 
@@ -77,6 +115,19 @@ class TrainingDay {
 
   int get totalSets => exercises.fold(0, (s, e) => s + e.sets);
   int get totalExercises => exercises.length;
+
+  /// Ênfase muscular do dia. Usa os grupos cadastrados nos exercícios e,
+  /// quando não há nenhum, o complemento do nome ("A - Peito e Tríceps").
+  String get emphasis {
+    final groups = <String>{};
+    for (final e in exercises) {
+      final group = e.muscleGroup?.trim();
+      if (group != null && group.isNotEmpty) groups.add(group);
+    }
+    if (groups.isNotEmpty) return groups.take(3).join(' · ');
+    final match = RegExp(r'^[A-Za-zÀ-ÿ0-9]{1,2}\s*[-–—·:]\s*(.+)$').firstMatch(name.trim());
+    return (match?.group(1) ?? name).trim();
+  }
 
   Map<String, dynamic> toJson() => {
         'id': id,
