@@ -8,6 +8,7 @@ import '../../data/models/bioimpedance.dart';
 import '../../services/bioimpedance_text_parser.dart';
 import '../../services/device_text_recognizer.dart';
 import '../../state/app_state.dart';
+import 'bioimpedance_json_dialog.dart';
 import 'bioimpedance_review.dart';
 
 /// Importa um laudo de bioimpedância (foto ou texto colado do PDF) e aplica
@@ -101,6 +102,15 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
     }
   }
 
+  Future<void> _fromJson() async {
+    final parsed = await showBioimpedanceJsonDialog(context);
+    if (!mounted || parsed == null) return;
+    setState(() {
+      _result = parsed;
+      _error = null;
+    });
+  }
+
   Future<void> _fromPdf() async {
     final FilePickerResult? result;
     try {
@@ -182,11 +192,12 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
               ),
               const SizedBox(height: 8),
               Text(
-                'O OCR local lê fotos sem enviá-las para servidores. Envie '
-                'seu laudo ou cole o texto; revise os valores antes de aplicar '
-                'ao perfil. O app reconhece '
-                'com peso, altura, IMC, % de gordura, massa muscular, água '
-                'corporal e taxa metabólica basal (TMB) medida.',
+                'O OCR local lê fotos sem enviá-las para servidores. Envie o '
+                'laudo, cole o texto ou um JSON; revise os valores antes de '
+                'aplicar ao perfil. O app reconhece peso, altura, IMC, % e '
+                'massa de gordura, massa muscular (total e esquelética), água '
+                'corporal, proteína, minerais, TMB medida, grau de obesidade, '
+                'gordura visceral e os dados segmentares.',
                 style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13.5),
               ),
             ],
@@ -223,6 +234,10 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
           _button(Icons.picture_as_pdf, 'Enviar arquivo PDF',
               'Escolha o laudo em PDF diretamente',
               _fromPdf),
+          const SizedBox(height: 12),
+          _button(Icons.data_object, 'Preencher com JSON',
+              'Cole um JSON com os campos da avaliação',
+              _fromJson),
         ],
         if (_error != null) ...[
           const SizedBox(height: 16),

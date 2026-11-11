@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/bioimpedance.dart';
 import '../../services/bioimpedance_text_parser.dart';
+import '../bioimpedance/bioimpedance_json_dialog.dart';
 import '../bioimpedance/bioimpedance_review.dart';
 import '../../services/device_text_recognizer.dart';
 import '../../state/app_state.dart';
@@ -135,6 +136,15 @@ class _BioOnboardingScreenState extends State<BioOnboardingScreen> {
     }
   }
 
+  Future<void> _fromJson() async {
+    final parsed = await showBioimpedanceJsonDialog(context);
+    if (!mounted || parsed == null) return;
+    setState(() {
+      _result = parsed;
+      _error = null;
+    });
+  }
+
   Future<void> _apply(Bioimpedance bio) async {
     final state = context.read<AppState>();
     await state.importBioimpedance(bio);
@@ -224,6 +234,9 @@ class _BioOnboardingScreenState extends State<BioOnboardingScreen> {
           const SizedBox(height: 12),
           _button(Icons.picture_as_pdf, 'Enviar arquivo PDF',
               'Escolha o laudo em PDF diretamente', _fromPdf),
+          const SizedBox(height: 12),
+          _button(Icons.data_object, 'Preencher com JSON',
+              'Cole um JSON com os campos da avaliação', _fromJson),
         ],
         if (_error != null) ...[
           const SizedBox(height: 16),

@@ -119,7 +119,8 @@ O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto co
 | **Histórico** | `features/history/history_screen.dart` | grade mensal com emoji do dia (🟢🟡🔴), detalhe do dia (macros + fibras 30 g + sódio 2000 mg + extras), resumo semanal com ações navegáveis |
 | **Coach** | `features/coach/coach_screen.dart` | "Foco de hoje" (insight principal), insights diários/semanais ordenados por prioridade, "Ações rápidas" (6 chips), rodapé "Sem IA generativa" |
 | **Banco de alimentos** | `features/food_db/food_db_screen.dart` | busca, filtro por categoria, detalhe, favoritos |
-| **Bioimpedância** | `features/bioimpedance/import_bioimpedance_screen.dart` | câmera/galeria/texto/PDF → parser extensível → revisão editável (geral + segmentar) → salvar |
+| **Bioimpedância** | `features/bioimpedance/import_bioimpedance_screen.dart` | câmera/galeria/texto/PDF/JSON → parser extensível → revisão editável (geral + segmentar) → salvar |
+| **JSON de bio** | `features/bioimpedance/bioimpedance_json_dialog.dart` | diálogo "Preencher com JSON": colar da área de transferência, exemplo, erro amigável; usado na importação e no onboarding |
 | **Revisão de bio** | `features/bioimpedance/bioimpedance_review.dart` | widget compartilhado: todos os campos editáveis, "não identificado", avisos e texto não reconhecido preservado |
 | **Saúde** | `features/health/health_screen.dart` | conectar Health Connect/Apple Health, sincronizar passos/sono/FC/treinos/peso, aplicar peso ao histórico |
 | **Onboarding bio** | `features/onboarding/bio_onboarding_screen.dart` | mesma UI da importação + "Preencher manualmente" |
@@ -195,7 +196,12 @@ O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto co
   - `bioimpedance_aliases.dart` — `BioField`, `bioFieldSpecs` (aliases por campo, unidade esperada, limites de sanidade), seções segmentares e marcadores de histórico.
   - `bioimpedance_manufacturer.dart` — perfis InBody/Tanita/Omron/seca/Maltron/Biodynamics/Renpho/Withings/Xiaomi, detecção de modelo e aliases extras por fabricante (para adicionar um fabricante, basta um novo perfil).
   - `bioimpedance_extractor.dart` — corta o histórico, lê blocos segmentares antes dos campos gerais, evita faixas de referência/escalas, valida coerência e devolve `BioimpedanceParseResult` (valores, trecho de origem, avisos, linhas não reconhecidas).
+  - `bioimpedance_validator.dart` — avisos de coerência (gordura > peso, % fora do esperado, soma segmentar alta, idade improvável), compartilhados por texto e JSON.
   - Lança `LocalParseException` (pt-BR) quando o texto está vazio ou não tem nenhum campo conhecido.
+- **`bioimpedance/bioimpedance_json_parser.dart`**: `BioimpedanceJsonParser.parse(String)` — entrada por JSON ao lado de foto/PDF/texto.
+  - Aceita o `Bioimpedance.toJson()` do próprio app, nomes canônicos do extrator (`weight`, `bmi`, `bodyFatPercentage`…), português com/sem acento e camelCase/snake_case (`massa_muscular_esquelética_kg`, `gordura_visceral`), números como texto (`"121,2"`, `"1.930"`), datas ISO/`dd/mm/aaaa`/epoch e `sexo`/`gender`/`fonte`.
+  - Segmentar aninhado (`massaMagraSegmentar: {rightArm: …}`, `gorduraSegmentar: {braço direito: …}`) ou plano (`massaMagraSegmentar.trunk`), com sufixos `pct`/`percentual` para percentuais.
+  - Chaves desconhecidas **não são descartadas**: vão para "texto não reconhecido" na revisão. Objeto pode vir dentro de um wrapper (`bioimpedance`, `bioimpedancia`, `resultado`, `laudo`).
 - **`food_database.dart`**: estático, "REGRA CRÍTICA: a IA NUNCA calcula nutrientes"; `all`, `byId`, `byBarcode`, `search` (scoring 1000/600/500/300/250, normalização sem acento), `categories`, `installOverlay()` (merge A/B).
 - **`open_food_facts_api.dart`**: API v3, `User-Agent: NutriCoach/1.0`, timeout 20 s, `byBarcode` e busca com `fields=code,product_name,brands,categories_tags,nutriments,image_front_url`.
 - **`food_data_updater.dart`**: slots A/B (`food_db.slot_a|b.payload`, `revision`) — hoje só exercitado por teste; **não está plugado no app**.
@@ -251,7 +257,7 @@ Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (títulos/U
 
 ## 14. Testes, qualidade e deploy
 
-- **Testes** (`test/`, 23 arquivos, 288 casos passando): banco TACO/cálculos/`DailySummary.status`, `MealTextParser`, `InsightRulesEngine`, `HouseholdMeasureConverter`/`DietPlan`, parser de bioimpedância (aliases, números, segmentar, histórico × atual, faixas de referência, data, modelo/JSON) e revisão editável, integração com a saúde (serviço falso), parsers de rótulo/OFF, `FoodDataUpdater`, copy das telas ("sem chat", "Sem IA generativa"), regressões de UI (`dashboard_hoje_regression_test`, `home_shell_fab_test`).
+- **Testes** (`test/`, 25 arquivos, 309 casos passando): banco TACO/cálculos/`DailySummary.status`, `MealTextParser`, `InsightRulesEngine`, `HouseholdMeasureConverter`/`DietPlan`, parser de bioimpedância (aliases, números, segmentar, histórico × atual, faixas de referência, data, modelo/JSON, entrada por JSON e diálogo), revisão editável, integração com a saúde (serviço falso), parsers de rótulo/OFF, `FoodDataUpdater`, copy das telas ("sem chat", "Sem IA generativa"), regressões de UI (`dashboard_hoje_regression_test`, `home_shell_fab_test`).
 - **Qualidade**: `flutter analyze` (só infos/warnings pré-existentes) · `flutter test` determinístico (SharedPreferences mockado).
 - **Deploy site**: `flutter build web --release` → `npx vercel build --prod` → `npx vercel deploy --prebuilt --prod --yes`. Produção: `https://nutricoachai-wheat.vercel.app`. O push ao GitHub **não** dispara build na Vercel (`Ignored Build Step = exit 0`), de propósito — a Vercel não compila Flutter.
 - **Local**: `flutter run` / `flutter run -d chrome` / `serve.py` (porta 8080).
