@@ -10,6 +10,7 @@ import '../data/food_db/food_database.dart';
 import '../data/models/body_track.dart';
 import '../data/models/bioimpedance.dart';
 import '../data/models/daily_summary.dart';
+import '../data/models/device_health.dart';
 import '../data/models/food.dart';
 import '../data/models/meal.dart';
 import '../data/models/tracking.dart';
@@ -19,6 +20,7 @@ import '../data/repositories/cloud_sync.dart';
 import '../data/repositories/local_store.dart';
 import '../services/bioimpedance_text_parser.dart';
 import '../services/diet_transfer.dart';
+import '../services/health_connect_service.dart';
 import '../services/household_measure.dart';
 import '../services/insight_rules_engine.dart';
 import '../services/meal_text_parser.dart';
@@ -29,9 +31,11 @@ import '../data/models/diet.dart';
 /// Estado central do app (ChangeNotifier). Offline-first com persistência
 /// local; pronto para sincronizar com Firestore quando configurado.
 class AppState extends ChangeNotifier {
-  AppState(this._store);
+  AppState(this._store, {IHealthConnectService? healthService})
+      : _healthService = healthService ?? HealthConnectService();
 
   final LocalStore _store;
+  final IHealthConnectService _healthService;
   final Uuid _uuid = const Uuid();
 
   /// Serviços locais (sem IA).
@@ -65,10 +69,32 @@ class AppState extends ChangeNotifier {
   String? _activeTrainingPlanId;
   List<TrainingSession> _trainingSessions = [];
 
+  // Health integration
+  HealthIntegrationConfig _healthConfig = const HealthIntegrationConfig(
+    enabled: false,
+    connected: false,
+    lastSyncAt: null,
+    permissionsGranted: [],
+    syncOnAppStart: true,
+  );
+  List<DailyStepsRecord> _healthSteps = [];
+  List<DeviceWorkoutSession> _deviceWorkouts = [];
+  List<SleepSessionRecord> _healthSleep = [];
+  List<HeartRateRecord> _healthHeartRate = [];
+  List<HealthSyncHistory> _healthSyncHistory = [];
+  bool _healthSyncing = false;
+
   bool _saving = false;
   String _statusMessage = '';
   bool get saving => _saving;
   String get statusMessage => _statusMessage;
+  HealthIntegrationConfig get healthConfig => _healthConfig;
+  List<DailyStepsRecord> get healthSteps => List.unmodifiable(_healthSteps);
+  List<DeviceWorkoutSession> get deviceWorkouts => List.unmodifiable(_deviceWorkouts);
+  List<SleepSessionRecord> get healthSleep => List.unmodifiable(_healthSleep);
+  List<HeartRateRecord> get healthHeartRate => List.unmodifiable(_healthHeartRate);
+  List<HealthSyncHistory> get healthSyncHistory => List.unmodifiable(_healthSyncHistory);
+  bool get healthSyncing => _healthSyncing;
 
   // ── Getters ──
   List<Meal> get meals => List.unmodifiable(_meals);
@@ -159,8 +185,23 @@ class AppState extends ChangeNotifier {
       _activeTrainingPlanId = _trainingPlans.first.id;
     }
     _trainingSessions = (_store.trainingSessions).map(TrainingSession.fromJson).toList();
+
+    if (_store.healthConfig != null) {
+      _healthConfig = HealthIntegrationConfig.fromJson(_store.healthConfig!);
+    }
+    _healthSteps = (_store.healthSteps).map(DailyStepsRecord.fromJson).toList();
+    _deviceWorkouts = (_store.healthWorkouts).map(DeviceWorkoutSession.fromJson).toList();
+    _healthSleep = (_store.healthSleep).map(SleepSessionRecord.fromJson).toList();
+    _healthHeartRate = (_store.healthHeartRate).map(HeartRateRecord.fromJson).toList();
+    _healthSyncHistory = (_store.healthSyncHistory).map(HealthSyncHistory.fromJson).toList();
+
     _initialized = true;
     notifyListeners();
+
+    // Auto-sync se configurado
+    if (_healthConfig.syncOnAppStart && _healthConfig.connected) {
+      unawaited(syncHealthData());
+    }
   }
 
   void _persist() {
@@ -395,6 +436,15 @@ class AppState extends ChangeNotifier {
     _store.setTrainingPlans(_trainingPlans.map((e) => e.toJson()).toList());
     _store.setActiveTrainingPlanId(_activeTrainingPlanId);
     _store.setTrainingSessions(_trainingSessions.map((e) => e.toJson()).toList());
+  }
+
+  void _persistHealth() {
+    _store.setHealthConfig(_healthConfig.toJson());
+    _store.setHealthSteps(_healthSteps.map((e) => e.toJson()).toList());
+    _store.setHealthWorkouts(_deviceWorkouts.map((e) => e.toJson()).toList());
+    _store.setHealthSleep(_healthSleep.map((e) => e.toJson()).toList());
+    _store.setHealthHeartRate(_healthHeartRate.map((e) => e.toJson()).toList());
+    _store.setHealthSyncHistory(_healthSyncHistory.map((e) => e.toJson()).toList());
   }
 
   // ── Treino ──
@@ -899,6 +949,99 @@ class AppState extends ChangeNotifier {
     );
   }
 
+  // ── Integração Health Connect ──
+  Future<bool> connectHealth() async {
+    await _healthService.configure();
+    final hasPerm = await _healthService.hasAllPermissions();
+    if (!hasPerm) {
+      final req = await _healthService.requestPermissions();
+      if (!req) {
+        return false;
+      }
+    }
+    _healthConfig = _healthConfig.copyWith(
+      enabled: true,
+      connected: true,
+      lastSyncAt: DateTime.now(),
+    );
+    _persistHealth();
+    notifyListeners();
+    await syncHealthData();
+    return true;
+  }
+
+  Future<void> disconnectHealth() async {
+    _healthConfig = _healthConfig.copyWith(
+      enabled: false,
+      connected: false,
+    );
+    _persistHealth();
+    notifyListeners();
+  }
+
+  Future<void> syncHealthData({DateTime? start}) async {
+    if (!_healthConfig.connected) return;
+    _healthSyncing = true;
+    notifyListeners();
+    try {
+      final end = DateTime.now();
+      final s = start ?? DateTime.now().subtract(const Duration(days: 90));
+      final steps = await _healthService.fetchDailySteps(start: s, end: end);
+      for (final st in steps) {
+        _healthSteps.removeWhere((e) => _sameDay(e.date, st.date));
+        _healthSteps.add(st);
+      }
+      final w = await _healthService.fetchWorkoutSessions(start: s, end: end);
+      for (final ws in w) {
+        _deviceWorkouts.removeWhere((e) => e.sourceId == ws.sourceId || e.id == ws.id);
+        _deviceWorkouts.add(ws);
+      }
+      final sl = await _healthService.fetchSleepSessions(start: s, end: end);
+      for (final ss in sl) {
+        _healthSleep.removeWhere((e) => e.id == ss.id);
+        _healthSleep.add(ss);
+      }
+      _healthConfig = _healthConfig.copyWith(lastSyncAt: DateTime.now());
+      _healthSyncHistory.insert(
+        0,
+        HealthSyncHistory(
+          syncAt: DateTime.now(),
+          status: 'success',
+          details: 'steps=${steps.length} workouts=${w.length} sleep=${sl.length}',
+        ),
+      );
+      _persistHealth();
+    } catch (e) {
+      _healthSyncHistory.insert(
+        0,
+        HealthSyncHistory(syncAt: DateTime.now(), status: 'error', error: e.toString()),
+      );
+    } finally {
+      _healthSyncing = false;
+      notifyListeners();
+    }
+  }
+
+  bool _sameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
+
+  DailyStepsRecord? get todaySteps {
+    final now = DateTime.now();
+    for (final s in _healthSteps) {
+      if (_sameDay(s.date, now)) return s;
+    }
+    return null;
+  }
+
+  List<DeviceWorkoutSession> workoutsForDay(DateTime date) =>
+      _deviceWorkouts.where((w) => _sameDay(w.startAt, date)).toList();
+
+  SleepSessionRecord? sleepForDay(DateTime date) {
+    for (final s in _healthSleep) {
+      if (_sameDay(s.startAt, date)) return s;
+    }
+    return null;
+  }
   double get tmbValue {
     final p = _profile;
     if (p == null) return 0;

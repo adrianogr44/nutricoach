@@ -51,6 +51,9 @@ dependencies:
   google_mlkit_text_recognition: ^0.17.1
   crypto: ^3.0.7
   google_fonts: ^6.2.1
+  # Health Connect (Android) e Apple Health (iOS) — leitura de dados do
+  # relógio via Mi Fitness → Health Connect, sem APIs privadas da Xiaomi.
+  health: 13.3.1
 
 dev_dependencies:
   flutter_test:

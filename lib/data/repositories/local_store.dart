@@ -26,6 +26,12 @@ class LocalStore {
   static const _kTrainingPlans = 'training_plans';
   static const _kActiveTrainingPlanId = 'active_training_plan_id';
   static const _kTrainingSessions = 'training_sessions';
+  static const _kHealthConfig = 'health_config';
+  static const _kHealthSteps = 'health_steps';
+  static const _kHealthWorkouts = 'health_workouts';
+  static const _kHealthSleep = 'health_sleep';
+  static const _kHealthHeartRate = 'health_heartrate';
+  static const _kHealthSyncHistory = 'health_sync_history';
 
   static Future<LocalStore> open() async {
     final prefs = await SharedPreferences.getInstance();
@@ -119,6 +125,31 @@ class LocalStore {
       value == null ? _prefs.remove(_kActiveTrainingPlanId) : _prefs.setString(_kActiveTrainingPlanId, value);
   List<Map<String, dynamic>> get trainingSessions => _read(_kTrainingSessions);
   Future<void> setTrainingSessions(List<Map<String, dynamic>> value) => _write(_kTrainingSessions, value);
+
+  // ── Integração saúde/dispositivos ──
+  Map<String, dynamic>? get healthConfig {
+    final raw = _prefs.getString(_kHealthConfig);
+    if (raw == null) return null;
+    return jsonDecode(raw) as Map<String, dynamic>;
+  }
+
+  Future<void> setHealthConfig(Map<String, dynamic> json) =>
+      _prefs.setString(_kHealthConfig, jsonEncode(json));
+
+  List<Map<String, dynamic>> get healthSteps => _read(_kHealthSteps);
+  Future<void> setHealthSteps(List<Map<String, dynamic>> value) => _write(_kHealthSteps, value);
+
+  List<Map<String, dynamic>> get healthWorkouts => _read(_kHealthWorkouts);
+  Future<void> setHealthWorkouts(List<Map<String, dynamic>> value) => _write(_kHealthWorkouts, value);
+
+  List<Map<String, dynamic>> get healthSleep => _read(_kHealthSleep);
+  Future<void> setHealthSleep(List<Map<String, dynamic>> value) => _write(_kHealthSleep, value);
+
+  List<Map<String, dynamic>> get healthHeartRate => _read(_kHealthHeartRate);
+  Future<void> setHealthHeartRate(List<Map<String, dynamic>> value) => _write(_kHealthHeartRate, value);
+
+  List<Map<String, dynamic>> get healthSyncHistory => _read(_kHealthSyncHistory);
+  Future<void> setHealthSyncHistory(List<Map<String, dynamic>> value) => _write(_kHealthSyncHistory, value);
 
   // ── Usuário autenticado (email de demo) ──
   String? get userEmail => _prefs.getString(_kUserEmail);
