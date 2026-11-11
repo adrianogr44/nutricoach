@@ -84,10 +84,11 @@ lib/
 | `/food-db` | `FoodDbScreen` |
 | `/coach` | `CoachScreen` |
 | `/bioimpedance` | `ImportBioimpedanceScreen` |
+| `/health` | `HealthScreen` |
 | `/diet` | `DietScreen` |
 | `/training` | `TrainingHomeScreen` |
 
-Também referenciado por insights e ações rápidas: `/history` — **atenção: essa rota não está registrada** em nenhum `MaterialApp.routes`, então `Navigator.pushNamed(context, '/history')` falha; a tela de Histórico só é alcançável pela aba 3 do shell (bug conhecido, ver seção 15).
+O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto com `/health` (tela de saúde do dispositivo). Também referenciado por insights e ações rápidas: `Navigator.pushNamed(context, '/history')` funciona e a aba 3 do shell continua abrindo a mesma tela.
 
 **`lib/shell/home_shell.dart` — HomeShell**
 
@@ -118,7 +119,9 @@ Também referenciado por insights e ações rápidas: `/history` — **atenção
 | **Histórico** | `features/history/history_screen.dart` | grade mensal com emoji do dia (🟢🟡🔴), detalhe do dia (macros + fibras 30 g + sódio 2000 mg + extras), resumo semanal com ações navegáveis |
 | **Coach** | `features/coach/coach_screen.dart` | "Foco de hoje" (insight principal), insights diários/semanais ordenados por prioridade, "Ações rápidas" (6 chips), rodapé "Sem IA generativa" |
 | **Banco de alimentos** | `features/food_db/food_db_screen.dart` | busca, filtro por categoria, detalhe, favoritos |
-| **Bioimpedância** | `features/bioimpedance/import_bioimpedance_screen.dart` | câmera/galeria/texto/PDF → parser → tabela de revisão → salvar |
+| **Bioimpedância** | `features/bioimpedance/import_bioimpedance_screen.dart` | câmera/galeria/texto/PDF → parser extensível → revisão editável (geral + segmentar) → salvar |
+| **Revisão de bio** | `features/bioimpedance/bioimpedance_review.dart` | widget compartilhado: todos os campos editáveis, "não identificado", avisos e texto não reconhecido preservado |
+| **Saúde** | `features/health/health_screen.dart` | conectar Health Connect/Apple Health, sincronizar passos/sono/FC/treinos/peso, aplicar peso ao histórico |
 | **Onboarding bio** | `features/onboarding/bio_onboarding_screen.dart` | mesma UI da importação + "Preencher manualmente" |
 | **Onboarding metas** | `features/onboarding/goals_screen.dart` | sexo/objetivo/atividade + preview ao vivo de TMB/TDEE/meta/proteína/água |
 | **Check-in / Login** | `checkin/checkin_screen.dart`, `auth/login_screen.dart` | **órfãos** — não estão ligados a rota nem aba hoje |
@@ -156,7 +159,8 @@ Também referenciado por insights e ações rápidas: `/history` — **atenção
 - **`body_track.dart`**: `WeightRecord(date, weightKg)` · `MeasureType` · `BodyMeasurement` · `ProgressPhoto`.
 - **`diet.dart`**: `DietMealItem(foodId, quantity, unit, customGramsPerUnit?, foodSnapshot)` · `DietMeal(id, name, time?, order, items)` · `DietPlan(id, name, meals, createdAt, updatedAt, isActive)`.
 - **`training.dart`**: `ExerciseDef`, `TrainingDay`, `TrainingPlan`, `TrainingSession`, `TrainingSet`, `ExerciseSession`, `TrainingStatus {active, completed}`.
-- **`bioimpedance.dart`**: `Bioimpedance(data, pesoKg?, alturaCm?, idade?, imc?, gorduraPct?, gorduraKg?, massaMuscularKg?, aguaL?, proteinaKg?, mineraisKg?, tmbKcal?, gorduraVisceral?, relacaoCinturaQuadril?, pesoIdealKg?, pontuacao?, sexo?)`.
+- **`bioimpedance.dart`**: `Bioimpedance(data, pesoKg?, alturaCm?, idade?, imc?, gorduraPct?, gorduraKg?, massaMuscularKg?, massaMuscularEsqueleticaKg?, aguaL?, proteinaKg?, mineraisKg?, tmbKcal?, gorduraVisceral?, grauObesidade?, relacaoCinturaQuadril?, pesoIdealKg?, pontuacao?, massaMagraSegmentar?, gorduraSegmentar?, fonte, sexo?)` · `SegmentalValues(rightArm?, leftArm?, trunk?, rightLeg?, leftLeg? + sufixos Pct)` para massa magra e gordura por segmento.
+- **`device_health.dart`**: `DailyStepsRecord`, `DeviceWorkoutSession`, `SleepSessionRecord`, `HeartRateRecord`, `HealthIntegrationConfig`, `HealthSyncHistory`, `HealthDataSource`.
 
 ---
 
@@ -186,7 +190,12 @@ Também referenciado por insights e ações rápidas: `/history` — **atenção
 - **`household_measure.dart`**: `MeasureUnit` (13 unidades: g, kg, ml, l, concha, xicara, colher, fatia, unidade…) e `toGrams(food, qty, unit, {customGramsPerUnit})` usando `standardPortionGrams`.
 - **`nutrition_label_text_parser.dart`**: texto de rótulo → `ParsedNutritionLabel` → `toFood()` (valores por 100 g, kJ→kcal, sódio g→mg).
 - **`device_text_recognizer.dart`**: ML Kit, **só Android/iOS** (`isSupported = false` em web/desktop).
-- **`bioimpedance_text_parser.dart`**: regex de laudo InBody + `parsePdf(bytes)` via pdfrx; lança `LocalParseException` (mensagem pt-BR) em erro.
+- **`bioimpedance_text_parser.dart`**: fachada `BioimpedanceTextParser` (`parse`, `parseDetailed`, `parsePdf`, `parsePdfDetailed`) sobre `services/bioimpedance/`:
+  - `bioimpedance_text_normalizer.dart` — minúsculas, sem acento/parênteses, espaços simples e leitura de números `1.234,5` / `1,234.5` / `35,4` / `35.4` (o ponto ambíguo é decidido pela faixa do campo).
+  - `bioimpedance_aliases.dart` — `BioField`, `bioFieldSpecs` (aliases por campo, unidade esperada, limites de sanidade), seções segmentares e marcadores de histórico.
+  - `bioimpedance_manufacturer.dart` — perfis InBody/Tanita/Omron/seca/Maltron/Biodynamics/Renpho/Withings/Xiaomi, detecção de modelo e aliases extras por fabricante (para adicionar um fabricante, basta um novo perfil).
+  - `bioimpedance_extractor.dart` — corta o histórico, lê blocos segmentares antes dos campos gerais, evita faixas de referência/escalas, valida coerência e devolve `BioimpedanceParseResult` (valores, trecho de origem, avisos, linhas não reconhecidas).
+  - Lança `LocalParseException` (pt-BR) quando o texto está vazio ou não tem nenhum campo conhecido.
 - **`food_database.dart`**: estático, "REGRA CRÍTICA: a IA NUNCA calcula nutrientes"; `all`, `byId`, `byBarcode`, `search` (scoring 1000/600/500/300/250, normalização sem acento), `categories`, `installOverlay()` (merge A/B).
 - **`open_food_facts_api.dart`**: API v3, `User-Agent: NutriCoach/1.0`, timeout 20 s, `byBarcode` e busca com `fields=code,product_name,brands,categories_tags,nutriments,image_front_url`.
 - **`food_data_updater.dart`**: slots A/B (`food_db.slot_a|b.payload`, `revision`) — hoje só exercitado por teste; **não está plugado no app**.
@@ -202,7 +211,7 @@ Também referenciado por insights e ações rápidas: `/history` — **atenção
 
 ## 11. Persistência e nuvem
 
-**`data/repositories/local_store.dart`** — SharedPreferences, JSON por chave: `profile`, `meals`, `workouts`, `weights`, `measurements`, `photos`, `water`, `favorites`, `custom_foods`, `user_email`, `bioimpedances`, `diet_plans`, `active_diet_id`, `training_plans`, `active_training_plan_id`, `training_sessions`. Toda mutação chama `_persist*`.
+**`data/repositories/local_store.dart`** — SharedPreferences, JSON por chave: `profile`, `meals`, `workouts`, `weights`, `measurements`, `photos`, `water`, `favorites`, `custom_foods`, `user_email`, `bioimpedances`, `diet_plans`, `active_diet_id`, `training_plans`, `active_training_plan_id`, `training_sessions`, `health_config`, `health_steps`, `health_workouts`, `health_sleep`, `health_heartrate`, `health_sync_history`, `health_resting_hr`, `health_weight`. Toda mutação chama `_persist*`.
 
 **`data/repositories/cloud_sync.dart`** — espelho Firestore (`users/{uid}/…`): `initialize()`, `syncMeal`, `deleteMeal`, `syncUser`, `syncWorkout`, `syncWeight`; `_userId => null` ⇒ tudo no-op hoje. `config/secrets.dart` tem strings vazias (sem credencial commitada).
 
@@ -242,7 +251,7 @@ Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (títulos/U
 
 ## 14. Testes, qualidade e deploy
 
-- **Testes** (`test/`, 15 arquivos, 49 casos passando): banco TACO/cálculos/`DailySummary.status`, `MealTextParser`, `InsightRulesEngine`, `HouseholdMeasureConverter`/`DietPlan`, parser de bioimpedância, parsers de rótulo/OFF, `FoodDataUpdater`, copy das telas ("sem chat", "Sem IA generativa"), regressões de UI (`dashboard_hoje_regression_test`, `home_shell_fab_test`).
+- **Testes** (`test/`, 23 arquivos, 288 casos passando): banco TACO/cálculos/`DailySummary.status`, `MealTextParser`, `InsightRulesEngine`, `HouseholdMeasureConverter`/`DietPlan`, parser de bioimpedância (aliases, números, segmentar, histórico × atual, faixas de referência, data, modelo/JSON) e revisão editável, integração com a saúde (serviço falso), parsers de rótulo/OFF, `FoodDataUpdater`, copy das telas ("sem chat", "Sem IA generativa"), regressões de UI (`dashboard_hoje_regression_test`, `home_shell_fab_test`).
 - **Qualidade**: `flutter analyze` (só infos/warnings pré-existentes) · `flutter test` determinístico (SharedPreferences mockado).
 - **Deploy site**: `flutter build web --release` → `npx vercel build --prod` → `npx vercel deploy --prebuilt --prod --yes`. Produção: `https://nutricoachai-wheat.vercel.app`. O push ao GitHub **não** dispara build na Vercel (`Ignored Build Step = exit 0`), de propósito — a Vercel não compila Flutter.
 - **Local**: `flutter run` / `flutter run -d chrome` / `serve.py` (porta 8080).
@@ -252,7 +261,10 @@ Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (títulos/U
 ## 15. Gaps conhecidos (não prometer nos prompts)
 
 - `CheckinScreen` e `LoginScreen` existem mas não estão acessíveis (órfãs).
-- **`/history` não está no mapa de rotas**: `pushNamed('/history')` é usado por `InsightRulesEngine` (rota do insight), por `CoachScreen._QuickActions` ("Ver progresso") e por `HistoryScreen._AiResumo`, mas lançaria "route does not exist" — hoje a tela só abre pela aba Histórico.
+- Saúde do dispositivo: Health Connect exige Android 9+ em uso real (o `minSdk` do app é 26); no iOS o `Runner.entitlements` (HealthKit) precisa estar habilitado na conta de desenvolvedor/App ID — sem isso o build assina, mas a leitura não funciona.
+- Saúde: `syncHealthData` busca 90 dias de passos/sono/treinos e só 7 dias de frequência cardíaca (limite para não pesar no aparelho).
+- Parser de bioimpedância: não há PDFs reais versionados no repo; os testes usam laudos textuais sintéticos no layout InBody. Relatórios muito diferentes podem cair em "texto não reconhecido", que fica preservado para revisão manual.
+- Parser de bioimpedância: OCR de laudo fotografado depende da qualidade da foto; o parser lê apenas texto (não interpreta gráficos).
 - Espelhamento Firestore desligado (`_userId == null`); `secrets.dart` vazio.
 - Atualização remota do banco (`FoodDataUpdater`) não plugada no app.
 - OCR indisponível em web/desktop (só Android/iOS).

@@ -8,6 +8,7 @@ import '../../data/models/bioimpedance.dart';
 import '../../services/bioimpedance_text_parser.dart';
 import '../../services/device_text_recognizer.dart';
 import '../../state/app_state.dart';
+import 'bioimpedance_review.dart';
 
 /// Importa um laudo de bioimpedância (foto ou texto colado do PDF) e aplica
 /// ao perfil: peso, altura, IMC, %gordura, massa muscular, água, TMB, etc.
@@ -23,7 +24,7 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
   final _textController = TextEditingController();
   bool _busy = false;
   String? _error;
-  Bioimpedance? _parsed;
+  BioimpedanceParseResult? _result;
 
   @override
   void dispose() {
@@ -47,8 +48,8 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
         return;
       }
       final text = await const DeviceTextRecognizer().recognizeFile(file.path);
-      final bio = const BioimpedanceTextParser().parse(text);
-      if (mounted) setState(() => _parsed = bio);
+      final result = const BioimpedanceTextParser().parseDetailed(text);
+      if (mounted) setState(() => _result = result);
     } on LocalParseException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -91,8 +92,8 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
       _error = null;
     });
     try {
-      final bio = const BioimpedanceTextParser().parse(text);
-      if (mounted) setState(() => _parsed = bio);
+      final result = const BioimpedanceTextParser().parseDetailed(text);
+      if (mounted) setState(() => _result = result);
     } on LocalParseException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -121,8 +122,8 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
     try {
       final file = result.files.single;
       final bytes = file.bytes ?? await file.xFile.readAsBytes();
-      final bio = await const BioimpedanceTextParser().parsePdf(bytes);
-      if (mounted) setState(() => _parsed = bio);
+      final parsed = await const BioimpedanceTextParser().parsePdfDetailed(bytes);
+      if (mounted) setState(() => _result = parsed);
     } on LocalParseException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -134,7 +135,7 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
 
   void _clear() {
     setState(() {
-      _parsed = null;
+      _result = null;
       _error = null;
       _busy = false;
     });
@@ -142,7 +143,7 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bio = _parsed;
+    final result = _result;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
@@ -151,7 +152,9 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
         title: const Text('Importar bioimpedância',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700)),
       ),
-      body: bio == null ? _buildSource() : _buildReview(bio),
+      body: result == null
+          ? _buildSource()
+          : BioimpedanceReview(result: result, onApply: _apply, onDiscard: _clear),
     );
   }
 
@@ -289,97 +292,6 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
     );
   }
 
-  Widget _buildReview(Bioimpedance bio) {
-    return ListView(
-      padding: const EdgeInsets.all(20),
-      children: [
-        Text(
-          'Valores encontrados no laudo — revise e aplique',
-          style: const TextStyle(
-            color: AppTheme.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontSize: 15,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Data do laudo: ${_fmtDate(bio.data)}',
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: Column(
-            children: [
-              _row('Peso', bio.pesoKg, 'kg'),
-              _row('Altura', bio.alturaCm, 'cm'),
-              _row('Idade', bio.idade?.toDouble(), 'anos'),
-              _row('IMC', bio.imc, 'kg/m²'),
-              _row('Gordura corporal', bio.gorduraPct, '%'),
-              _row('Massa de gordura', bio.gorduraKg, 'kg'),
-              _row('Massa muscular', bio.massaMuscularKg, 'kg'),
-              _row('Água corporal', bio.aguaL, 'L'),
-              _row('Proteína', bio.proteinaKg, 'kg'),
-              _row('Minerais', bio.mineraisKg, 'kg'),
-              _row('TMB medida', bio.tmbKcal, 'kcal/dia'),
-              _row('Gordura visceral', bio.gorduraVisceral?.toDouble(), 'nível'),
-              _row('Cintura/quadril', bio.relacaoCinturaQuadril, ''),
-              _row('Peso ideal', bio.pesoIdealKg, 'kg'),
-              _row('Pontuação InBody', bio.pontuacao?.toDouble(), '/100'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        Row(
-          children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: _clear,
-                child: const Text('Descartar'),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              flex: 2,
-              child: FilledButton.icon(
-                onPressed: () => _apply(bio),
-                icon: const Icon(Icons.check_circle_outline),
-                label: const Text('Aplicar ao perfil'),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  Widget _row(String label, double? value, String unit) {
-    final filled = value != null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(label,
-                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
-          ),
-          Text(
-            filled ? '${_fmtNum(value)} $unit' : '— não informado',
-            style: TextStyle(
-              color: filled ? AppTheme.textPrimary : AppTheme.textMuted,
-              fontSize: 14,
-              fontWeight: filled ? FontWeight.w700 : FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _apply(Bioimpedance bio) async {
     final state = context.read<AppState>();
     await state.importBioimpedance(bio);
@@ -389,11 +301,4 @@ class _ImportBioimpedanceScreenState extends State<ImportBioimpedanceScreen> {
       const SnackBar(content: Text('Bioimpedância aplicada ao perfil!')),
     );
   }
-
-  static String _fmtDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
-  static String _fmtNum(double v) => v == v.roundToDouble()
-      ? v.toStringAsFixed(0)
-      : v.toStringAsFixed(2).replaceAll('.', ',');
 }

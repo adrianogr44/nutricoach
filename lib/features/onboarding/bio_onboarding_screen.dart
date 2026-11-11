@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../data/models/bioimpedance.dart';
 import '../../services/bioimpedance_text_parser.dart';
+import '../bioimpedance/bioimpedance_review.dart';
 import '../../services/device_text_recognizer.dart';
 import '../../state/app_state.dart';
 import 'goals_screen.dart';
@@ -25,7 +26,7 @@ class _BioOnboardingScreenState extends State<BioOnboardingScreen> {
   final _textController = TextEditingController();
   bool _busy = false;
   String? _error;
-  Bioimpedance? _parsed;
+  BioimpedanceParseResult? _result;
 
   @override
   void dispose() {
@@ -49,8 +50,8 @@ class _BioOnboardingScreenState extends State<BioOnboardingScreen> {
         return;
       }
       final text = await const DeviceTextRecognizer().recognizeFile(file.path);
-      final bio = const BioimpedanceTextParser().parse(text);
-      if (mounted) setState(() => _parsed = bio);
+      final parsed = const BioimpedanceTextParser().parseDetailed(text);
+      if (mounted) setState(() => _result = parsed);
     } on LocalParseException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -81,8 +82,8 @@ class _BioOnboardingScreenState extends State<BioOnboardingScreen> {
     try {
       final file = result.files.single;
       final bytes = file.bytes ?? await file.xFile.readAsBytes();
-      final bio = await const BioimpedanceTextParser().parsePdf(bytes);
-      if (mounted) setState(() => _parsed = bio);
+      final parsed = await const BioimpedanceTextParser().parsePdfDetailed(bytes);
+      if (mounted) setState(() => _result = parsed);
     } on LocalParseException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } catch (e) {
@@ -125,8 +126,8 @@ class _BioOnboardingScreenState extends State<BioOnboardingScreen> {
       _error = null;
     });
     try {
-      final bio = const BioimpedanceTextParser().parse(text);
-      if (mounted) setState(() => _parsed = bio);
+      final parsed = const BioimpedanceTextParser().parseDetailed(text);
+      if (mounted) setState(() => _result = parsed);
     } on LocalParseException catch (e) {
       if (mounted) setState(() => _error = e.message);
     } finally {
@@ -151,12 +152,12 @@ class _BioOnboardingScreenState extends State<BioOnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final bio = _parsed;
+    final result = _result;
 
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: SafeArea(
-        child: bio == null ? _buildSource() : _buildReview(bio),
+        child: result == null ? _buildSource() : _buildReview(result),
       ),
     );
   }
@@ -315,103 +316,17 @@ class _BioOnboardingScreenState extends State<BioOnboardingScreen> {
     );
   }
 
-  Widget _buildReview(Bioimpedance bio) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      children: [
-        Row(
-          children: [
-            IconButton(
-              onPressed: () => setState(() {
-                _parsed = null;
-                _error = null;
-              }),
-              icon: const Icon(Icons.arrow_back, color: AppTheme.textPrimary),
-              tooltip: 'Voltar',
-            ),
-            const SizedBox(width: 4),
-            const Expanded(
-              child: Text(
-                'Valores encontrados no laudo',
-                style: TextStyle(
-                  color: AppTheme.textPrimary,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 15,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Data do laudo: ${_fmtDate(bio.data)}',
-          style: const TextStyle(color: AppTheme.textSecondary, fontSize: 13),
-        ),
-        const SizedBox(height: 12),
-        Container(
-          decoration: BoxDecoration(
-            color: AppTheme.surface,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppTheme.border),
-          ),
-          child: Column(
-            children: [
-              _row('Peso', bio.pesoKg, 'kg'),
-              _row('Altura', bio.alturaCm, 'cm'),
-              _row('Idade', bio.idade?.toDouble(), 'anos'),
-              _row('IMC', bio.imc, 'kg/m²'),
-              _row('Gordura corporal', bio.gorduraPct, '%'),
-              _row('Massa de gordura', bio.gorduraKg, 'kg'),
-              _row('Massa muscular', bio.massaMuscularKg, 'kg'),
-              _row('Água corporal', bio.aguaL, 'L'),
-              _row('Proteína', bio.proteinaKg, 'kg'),
-              _row('Minerais', bio.mineraisKg, 'kg'),
-              _row('TMB medida', bio.tmbKcal, 'kcal/dia'),
-              _row('Gordura visceral', bio.gorduraVisceral?.toDouble(), 'nível'),
-              _row('Cintura/quadril', bio.relacaoCinturaQuadril, ''),
-              _row('Peso ideal', bio.pesoIdealKg, 'kg'),
-              _row('Pontuação InBody', bio.pontuacao?.toDouble(), '/100'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: () => _apply(bio),
-          icon: const Icon(Icons.check_circle_outline),
-          label: const Text('Aplicar e continuar'),
-          style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52)),
-        ),
-      ],
+
+  /// Revisão humana compartilhada com a tela de importação.
+  Widget _buildReview(BioimpedanceParseResult result) {
+    return BioimpedanceReview(
+      result: result,
+      onApply: _apply,
+      onDiscard: () => setState(() {
+        _result = null;
+        _error = null;
+      }),
+      applyLabel: 'Aplicar e continuar',
     );
   }
-
-  Widget _row(String label, double? value, String unit) {
-    final filled = value != null;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Row(
-        children: [
-          Expanded(
-            child: Text(label,
-                style: const TextStyle(color: AppTheme.textSecondary, fontSize: 14)),
-          ),
-          Text(
-            filled ? '${_fmtNum(value)} $unit' : '— não informado',
-            style: TextStyle(
-              color: filled ? AppTheme.textPrimary : AppTheme.textMuted,
-              fontSize: 14,
-              fontWeight: filled ? FontWeight.w700 : FontWeight.w400,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  static String _fmtDate(DateTime d) =>
-      '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
-
-  static String _fmtNum(double v) => v == v.roundToDouble()
-      ? v.toStringAsFixed(0)
-      : v.toStringAsFixed(2).replaceAll('.', ',');
 }
