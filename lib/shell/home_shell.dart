@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../core/theme/app_theme.dart';
-import '../features/checkin/checkin_screen.dart';
 import '../features/coach/coach_screen.dart';
 import '../features/dashboard/dashboard_screen.dart';
 import '../features/diet/diet_screen.dart';

@@ -1,5 +1,3 @@
-import 'package:flutter/foundation.dart';
-
 /// Exercício dentro de um treino.
 class ExerciseDef {
   const ExerciseDef({

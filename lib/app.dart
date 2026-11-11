@@ -9,6 +9,7 @@ import 'features/bioimpedance/import_bioimpedance_screen.dart';
 import 'features/coach/coach_screen.dart';
 import 'features/diet/diet_screen.dart';
 import 'features/food_db/food_db_screen.dart';
+import 'features/history/history_screen.dart';
 import 'features/measurements/measurements_screen.dart';
 import 'features/meals/add_meal_screen.dart';
 import 'features/metas/metas_screen.dart';
@@ -71,6 +72,7 @@ class _Root extends StatelessWidget {
         '/measurements': (_) => const MeasurementsScreen(),
         '/goals': (_) => const MetasScreen(),
         '/food-db': (_) => const FoodDbScreen(),
+        '/history': (_) => const HistoryScreen(),
         '/coach': (_) => const CoachScreen(),
         '/bioimpedance': (_) => const ImportBioimpedanceScreen(),
         '/diet': (_) => const DietScreen(),
