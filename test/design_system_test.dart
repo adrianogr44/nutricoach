@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:nutricoach_ai/core/theme/app_theme.dart';
 import 'package:nutricoach_ai/data/repositories/local_store.dart';
+import 'package:nutricoach_ai/features/dashboard/dashboard_screen.dart';
 import 'package:nutricoach_ai/state/app_state.dart';
 import 'package:nutricoach_ai/widgets/app_components.dart';
 import 'package:provider/provider.dart';
@@ -136,5 +137,27 @@ void main() {
     await tester.tap(find.text('Detalhes avançados'));
     await tester.pumpAndSettle();
     expect(find.text('Conteúdo interno'), findsOneWidget);
+  });
+
+  testWidgets('dashboard completo não estoura em 360 px', (tester) async {
+    tester.view.physicalSize = const Size(360, 900);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final state = await _makeState();
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: state,
+        child: MaterialApp(
+          theme: AppTheme.dark(),
+          home: const DashboardScreen(),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('PRÓXIMA AÇÃO'), findsOneWidget);
+    expect(find.byType(SingleChildScrollView), findsWidgets);
+    expect(tester.takeException(), isNull);
   });
 }

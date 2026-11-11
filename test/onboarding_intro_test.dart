@@ -11,6 +11,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 void main() {
   testWidgets('primeiro acesso mostra a introdução antes do onboarding de bio',
       (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     SharedPreferences.setMockInitialValues({});
     await tester.pumpWidget(const NutriCoachApp());
     await tester.pumpAndSettle();
@@ -30,6 +33,9 @@ void main() {
 
   testWidgets('percorrer a introdução marca como vista e persiste',
       (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     SharedPreferences.setMockInitialValues({});
     final state = AppState(await LocalStore.open());
     await state.init();
@@ -71,6 +77,9 @@ void main() {
 
   testWidgets('introdução pode ser revista sem alterar o fluxo atual',
       (tester) async {
+    tester.view.physicalSize = const Size(360, 800);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
     SharedPreferences.setMockInitialValues({});
     final state = AppState(await LocalStore.open());
     await state.init();

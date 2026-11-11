@@ -42,7 +42,7 @@ Future<AppState> _seededState() async {
 void main() {
   testWidgets('perfil e ajustes organiza todas as áreas com funções reais',
       (tester) async {
-    tester.view.physicalSize = const Size(390, 2400);
+    tester.view.physicalSize = const Size(360, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -93,7 +93,7 @@ void main() {
 
   testWidgets('rever introdução abre e fecha sem sair dos ajustes',
       (tester) async {
-    tester.view.physicalSize = const Size(390, 2400);
+    tester.view.physicalSize = const Size(360, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 
@@ -122,7 +122,7 @@ void main() {
   });
 
   testWidgets('sobre o app informa versão e privacidade', (tester) async {
-    tester.view.physicalSize = const Size(390, 2400);
+    tester.view.physicalSize = const Size(360, 2400);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.reset);
 

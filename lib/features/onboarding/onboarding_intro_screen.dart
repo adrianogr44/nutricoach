@@ -133,8 +133,8 @@ class _OnboardingIntroScreenState extends State<OnboardingIntroScreen> {
                   padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
                   child: Row(
                     children: [
-                      const _BrandMark(),
-                      const Spacer(),
+                      const Expanded(child: _BrandMark()),
+                      const SizedBox(width: 8),
                       TextButton(
                         key: const Key('onboarding-skip'),
                         onPressed: _finish,
@@ -264,7 +264,7 @@ class _BrandMark extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Row(
-      mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.max,
       children: [
         Container(
           width: 34,
@@ -285,13 +285,17 @@ class _BrandMark extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 10),
-        const Text(
-          'NutriCoach',
-          style: TextStyle(
-            color: AppTheme.textPrimary,
-            fontSize: 17,
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.4,
+        const Flexible(
+          child: Text(
+            'NutriCoach',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 17,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.4,
+            ),
           ),
         ),
         const SizedBox(width: 5),
@@ -449,13 +453,22 @@ class _Illustration extends StatelessWidget {
         );
       case _PreviewKind.navigation:
         return Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: const [
-            _MockNav(icon: Icons.home_outlined, label: 'Hoje', active: true),
-            _MockNav(icon: Icons.restaurant_menu, label: 'Dieta'),
-            _MockNav(icon: Icons.fitness_center, label: 'Treino'),
-            _MockNav(icon: Icons.calendar_month, label: 'Histórico'),
-            _MockNav(icon: Icons.lightbulb_outline, label: 'Coach'),
+            Expanded(
+              child: _MockNav(icon: Icons.home_outlined, label: 'Hoje', active: true),
+            ),
+            Expanded(
+              child: _MockNav(icon: Icons.restaurant_menu, label: 'Dieta'),
+            ),
+            Expanded(
+              child: _MockNav(icon: Icons.fitness_center, label: 'Treino'),
+            ),
+            Expanded(
+              child: _MockNav(icon: Icons.calendar_month, label: 'Histórico'),
+            ),
+            Expanded(
+              child: _MockNav(icon: Icons.lightbulb_outline, label: 'Coach'),
+            ),
           ],
         );
     }
@@ -486,20 +499,28 @@ class _MockRow extends StatelessWidget {
           Icon(icon, size: 18, color: AppTheme.primary),
           const SizedBox(width: 10),
           Expanded(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: AppTheme.textPrimary,
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Text(
-            hint,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
-              fontSize: 12,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(height: 1),
+                Text(
+                  hint,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
             ),
           ),
         ],
@@ -570,6 +591,9 @@ class _MockNav extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: TextAlign.center,
           style: TextStyle(
             color: color,
             fontSize: 10,
