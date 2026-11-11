@@ -32,6 +32,8 @@ class LocalStore {
   static const _kHealthSleep = 'health_sleep';
   static const _kHealthHeartRate = 'health_heartrate';
   static const _kHealthSyncHistory = 'health_sync_history';
+  static const _kHealthRestingHr = 'health_resting_hr';
+  static const _kHealthWeight = 'health_weight';
 
   static Future<LocalStore> open() async {
     final prefs = await SharedPreferences.getInstance();
@@ -150,6 +152,14 @@ class LocalStore {
 
   List<Map<String, dynamic>> get healthSyncHistory => _read(_kHealthSyncHistory);
   Future<void> setHealthSyncHistory(List<Map<String, dynamic>> value) => _write(_kHealthSyncHistory, value);
+
+  double? get healthRestingHr => _prefs.getDouble(_kHealthRestingHr);
+  Future<void> setHealthRestingHr(double? value) async =>
+      value == null ? _prefs.remove(_kHealthRestingHr) : _prefs.setDouble(_kHealthRestingHr, value);
+
+  double? get healthWeight => _prefs.getDouble(_kHealthWeight);
+  Future<void> setHealthWeight(double? value) async =>
+      value == null ? _prefs.remove(_kHealthWeight) : _prefs.setDouble(_kHealthWeight, value);
 
   // ── Usuário autenticado (email de demo) ──
   String? get userEmail => _prefs.getString(_kUserEmail);

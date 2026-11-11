@@ -406,6 +406,15 @@ class _SecondaryStats extends StatelessWidget {
         _StatRow(icon: Icons.monitor_weight_outlined, label: 'Peso', value: weight > 0 ? '${weight.toStringAsFixed(1)} kg${perdido > 0 ? "  ·  −${perdido.toStringAsFixed(1)} kg" : ""}' : 'Registrar peso', onTap: () => Navigator.pushNamed(context, '/weight')),
         const Divider(height: 1, color: AppTheme.border),
         _StatRow(icon: Icons.biotech_outlined, label: 'Bioimpedância', value: bio != null ? '${bio.pontuacao ?? "—"} pts · ${bio.tmbKcal?.round() ?? "—"} kcal' : 'Importar laudo InBody', onTap: () => Navigator.pushNamed(context, '/bioimpedance')),
+        const Divider(height: 1, color: AppTheme.border),
+        _StatRow(
+          icon: Icons.watch_outlined,
+          label: 'Saúde',
+          value: state.healthConfig.connected
+              ? (state.todaySteps != null ? '${state.todaySteps!.steps} passos hoje' : 'Conectado · sincronizar')
+              : 'Conectar relógio ou balança',
+          onTap: () => Navigator.pushNamed(context, '/health'),
+        ),
       ],
     );
   }

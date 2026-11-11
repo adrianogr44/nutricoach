@@ -83,6 +83,8 @@ class AppState extends ChangeNotifier {
   List<HeartRateRecord> _healthHeartRate = [];
   List<HealthSyncHistory> _healthSyncHistory = [];
   bool _healthSyncing = false;
+  double? _healthRestingHr;
+  double? _healthWeightKg;
 
   bool _saving = false;
   String _statusMessage = '';
@@ -95,6 +97,9 @@ class AppState extends ChangeNotifier {
   List<HeartRateRecord> get healthHeartRate => List.unmodifiable(_healthHeartRate);
   List<HealthSyncHistory> get healthSyncHistory => List.unmodifiable(_healthSyncHistory);
   bool get healthSyncing => _healthSyncing;
+  double? get healthRestingHr => _healthRestingHr;
+  double? get healthWeightKg => _healthWeightKg;
+  bool get healthSupported => _healthService.isAvailable;
 
   // ── Getters ──
   List<Meal> get meals => List.unmodifiable(_meals);
@@ -194,6 +199,8 @@ class AppState extends ChangeNotifier {
     _healthSleep = (_store.healthSleep).map(SleepSessionRecord.fromJson).toList();
     _healthHeartRate = (_store.healthHeartRate).map(HeartRateRecord.fromJson).toList();
     _healthSyncHistory = (_store.healthSyncHistory).map(HealthSyncHistory.fromJson).toList();
+    _healthRestingHr = _store.healthRestingHr;
+    _healthWeightKg = _store.healthWeight;
 
     _initialized = true;
     notifyListeners();
@@ -445,6 +452,8 @@ class AppState extends ChangeNotifier {
     _store.setHealthSleep(_healthSleep.map((e) => e.toJson()).toList());
     _store.setHealthHeartRate(_healthHeartRate.map((e) => e.toJson()).toList());
     _store.setHealthSyncHistory(_healthSyncHistory.map((e) => e.toJson()).toList());
+    _store.setHealthRestingHr(_healthRestingHr);
+    _store.setHealthWeight(_healthWeightKg);
   }
 
   // ── Treino ──
@@ -1001,13 +1010,26 @@ class AppState extends ChangeNotifier {
         _healthSleep.removeWhere((e) => e.id == ss.id);
         _healthSleep.add(ss);
       }
+      final hr = await _healthService.fetchHeartRate(
+        start: DateTime.now().subtract(const Duration(days: 7)),
+        end: end,
+      );
+      for (final h in hr) {
+        _healthHeartRate.removeWhere((e) => e.timestamp == h.timestamp);
+        _healthHeartRate.add(h);
+      }
+      _healthHeartRate.sort((a, b) => a.date.compareTo(b.date));
+      final resting = await _healthService.fetchRestingHeartRate(date: DateTime.now());
+      if (resting != null) _healthRestingHr = resting;
+      final deviceWeight = await _healthService.fetchLatestWeightKg();
+      if (deviceWeight != null) _healthWeightKg = deviceWeight;
       _healthConfig = _healthConfig.copyWith(lastSyncAt: DateTime.now());
       _healthSyncHistory.insert(
         0,
         HealthSyncHistory(
           syncAt: DateTime.now(),
           status: 'success',
-          details: 'steps=${steps.length} workouts=${w.length} sleep=${sl.length}',
+          details: 'steps=${steps.length} workouts=${w.length} sleep=${sl.length} hr=${hr.length}',
         ),
       );
       _persistHealth();
@@ -1041,6 +1063,16 @@ class AppState extends ChangeNotifier {
       if (_sameDay(s.startAt, date)) return s;
     }
     return null;
+  }
+
+  /// Usa o peso mais recente do relógio/balança como registro de peso de hoje.
+  Future<void> applyDeviceWeight() async {
+    final kg = _healthWeightKg;
+    if (kg == null || kg <= 0) return;
+    final now = DateTime.now();
+    await addWeight(WeightRecord(date: DateTime(now.year, now.month, now.day), weightKg: kg));
+    _statusMessage = 'Peso do dispositivo aplicado ao histórico.';
+    notifyListeners();
   }
   double get tmbValue {
     final p = _profile;

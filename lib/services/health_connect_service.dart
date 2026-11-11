@@ -30,7 +30,11 @@ class HealthConnectService implements IHealthConnectService {
   bool _configured = false;
 
   @override
-  bool get isAvailable => kIsWeb ? false : true;
+  bool get isAvailable {
+    if (kIsWeb) return false;
+    return defaultTargetPlatform == TargetPlatform.android ||
+        defaultTargetPlatform == TargetPlatform.iOS;
+  }
 
   @override
   bool get isConfigured => _configured;
@@ -113,34 +117,52 @@ class HealthConnectService implements IHealthConnectService {
   Future<List<DailyStepsRecord>> fetchDailySteps({required DateTime start, required DateTime end}) async {
     if (!isAvailable) return [];
     try {
-      final steps = await _health.getHealthDataFromTypes(
-        types: [HealthDataType.STEPS],
-        startTime: start,
-        endTime: end,
-      );
-      // Agrupar por dia - implementação simplificada
       final Map<String, int> dailySteps = {};
       final Map<String, double> dailyDist = {};
       final Map<String, double> dailyCal = {};
-      
+
+      final steps = await _health.getHealthDataFromTypes(
+        types: const [HealthDataType.STEPS],
+        startTime: start,
+        endTime: end,
+      );
       for (final p in steps) {
-        final key = _dateKey(p.dateFrom);
+        final key = _dateKey(_local(p.dateFrom));
         dailySteps[key] = (dailySteps[key] ?? 0) + (p.value as NumericHealthValue).numericValue.toInt();
       }
-      // Para cálculos reais, implementar agregação adequada
-      final result = <DailyStepsRecord>[];
-      for (final entry in dailySteps.entries) {
-        final d = _parseDateKey(entry.key);
-        result.add(DailyStepsRecord(
-          date: d,
-          steps: entry.value,
-          distanceMeters: dailyDist[entry.key] ?? 0,
-          caloriesBurned: dailyCal[entry.key] ?? 0,
-          source: HealthDataSource.healthConnect,
-          lastSyncAt: DateTime.now(),
-        ));
+
+      final distances = await _health.getHealthDataFromTypes(
+        types: const [HealthDataType.DISTANCE_WALKING_RUNNING],
+        startTime: start,
+        endTime: end,
+      );
+      for (final p in distances) {
+        final key = _dateKey(_local(p.dateFrom));
+        dailyDist[key] = (dailyDist[key] ?? 0) + (p.value as NumericHealthValue).numericValue.toDouble();
       }
-      return result;
+
+      final energy = await _health.getHealthDataFromTypes(
+        types: const [HealthDataType.ACTIVE_ENERGY_BURNED],
+        startTime: start,
+        endTime: end,
+      );
+      for (final p in energy) {
+        final key = _dateKey(_local(p.dateFrom));
+        dailyCal[key] = (dailyCal[key] ?? 0) + (p.value as NumericHealthValue).numericValue.toDouble();
+      }
+
+      final keys = <String>{...dailySteps.keys, ...dailyDist.keys, ...dailyCal.keys};
+      return [
+        for (final key in keys)
+          DailyStepsRecord(
+            date: _parseDateKey(key),
+            steps: dailySteps[key] ?? 0,
+            distanceMeters: dailyDist[key] ?? 0,
+            caloriesBurned: dailyCal[key] ?? 0,
+            source: HealthDataSource.healthConnect,
+            lastSyncAt: DateTime.now(),
+          ),
+      ]..sort((a, b) => a.date.compareTo(b.date));
     } catch (e) {
       debugPrint('fetchDailySteps error: $e');
       return [];
@@ -266,6 +288,8 @@ class HealthConnectService implements IHealthConnectService {
       return null;
     }
   }
+
+  DateTime _local(DateTime d) => d.isUtc ? d.toLocal() : d;
 
   String _dateKey(DateTime d) => '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
   DateTime _parseDateKey(String k) {
