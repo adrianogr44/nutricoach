@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../core/theme/app_theme.dart';
 import '../../services/insight_rules_engine.dart';
 import '../../state/app_state.dart';
+import '../../widgets/app_components.dart';
 import '../../widgets/core_widgets.dart';
 
 /// Coach determinístico: insights derivados de regras locais, sem IA generativa.
@@ -44,7 +45,17 @@ class CoachScreen extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          const ContextualTip(
+            tipId: 'coach-insights',
+            title: 'Orientações explicadas',
+            message:
+                'O Coach calcula tudo a partir dos seus registros: calorias, '
+                'proteína, água e treino. Nada é inventado e nenhum dado sai do '
+                'seu dispositivo.',
+            icon: Icons.auto_awesome,
+          ),
+          const SizedBox(height: 12),
           if (primary != null) ...[
             const SectionHeader(title: 'Foco de hoje'),
             const SizedBox(height: 12),
@@ -63,6 +74,10 @@ class CoachScreen extends StatelessWidget {
           const SectionHeader(title: 'Sua semana'),
           const SizedBox(height: 12),
           for (final ins in weeklyInsights) _InsightRow(insight: ins),
+          const SizedBox(height: 20),
+          const SectionHeader(title: 'Perguntas rápidas'),
+          const SizedBox(height: 12),
+          _FaqSection(state: state),
           const SizedBox(height: 20),
           const SectionHeader(title: 'Ações rápidas'),
           const SizedBox(height: 12),
@@ -240,6 +255,85 @@ class _ActionLink extends StatelessWidget {
         if (insight.route != null) Navigator.pushNamed(context, insight.route!);
       },
       child: Text(insight.action!, style: TextStyle(color: AppTheme.primary, fontSize: 13, fontWeight: FontWeight.w600)),
+    );
+  }
+}
+
+class _FaqSection extends StatelessWidget {
+  const _FaqSection({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final today = state.today;
+    final remaining = today.metaKcal - today.kcalConsumed;
+    final proteinLeft = (today.metaProtein - today.protein).clamp(0, 9999).toDouble();
+    final now = DateTime.now();
+    final trained = state.trainingCompletedOn(now);
+    final active = state.activeTrainingSession;
+    final plan = state.activeTrainingPlan;
+    final day = plan?.today;
+
+    final items = <({String question, String answer, IconData icon})>[
+      (
+        question: 'Quanto ainda posso comer hoje?',
+        answer: remaining >= 0
+            ? 'Ainda cabem aproximadamente ${remaining.round()} kcal dentro da sua meta de ${today.metaKcal.round()} kcal. O valor considera apenas o que você registrou.'
+            : 'Você passou ${remaining.abs().round()} kcal da meta de ${today.metaKcal.round()} kcal. Um dia fora do planejado não define o resultado — volte ao plano na próxima refeição.',
+        icon: Icons.local_fire_department_outlined,
+      ),
+      (
+        question: 'Como está minha proteína?',
+        answer: today.metaProtein <= 0
+            ? 'Sua meta de proteína ainda não foi definida. Ajuste em Perfil e metas para acompanhar.'
+            : 'Você consumiu ${today.protein.round()} g de ${today.metaProtein.round()} g. '
+                '${proteinLeft <= 0 ? 'Meta atingida — mantenha o restante do dia equilibrado.' : 'Faltam cerca de ${proteinLeft.round()} g para chegar à meta.'}',
+        icon: Icons.egg_alt_outlined,
+      ),
+      (
+        question: 'Já treinei hoje?',
+        answer: active != null
+            ? 'Você tem um treino em andamento. Abra a aba Treino para continuar de onde parou.'
+            : trained
+                ? 'Sim, há um treino concluído hoje. O resumo com séries e volume está no Histórico.'
+                : day == null
+                    ? 'Você ainda não tem uma ficha com treino para hoje. Monte sua ficha na aba Treino.'
+                    : 'Ainda não. O treino de hoje é ${day.name}, com ${day.totalExercises} exercícios. Abra a aba Treino quando quiser começar.',
+        icon: Icons.fitness_center,
+      ),
+      (
+        question: 'De onde vêm estas orientações?',
+        answer: 'São cálculos locais feitos com os seus registros de refeições, água, peso e treino. O app não usa IA generativa nesta versão e não envia seus dados para gerar respostas.',
+        icon: Icons.info_outline,
+      ),
+    ];
+
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: Column(
+        children: [
+          for (var i = 0; i < items.length; i++) ...[
+            AppExpandableSection(
+              key: Key('coach-faq-$i'),
+              icon: items[i].icon,
+              title: items[i].question,
+              children: [
+                Text(
+                  items[i].answer,
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13.5,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+            if (i < items.length - 1)
+              const Divider(height: 1, indent: 50, endIndent: 14),
+          ],
+        ],
+      ),
     );
   }
 }

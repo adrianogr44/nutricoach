@@ -16,6 +16,8 @@ import 'features/meals/add_meal_screen.dart';
 import 'features/metas/metas_screen.dart';
 import 'features/onboarding/bio_onboarding_screen.dart';
 import 'features/onboarding/goals_screen.dart';
+import 'features/onboarding/onboarding_intro_screen.dart';
+import 'features/settings/settings_screen.dart';
 import 'features/training/training_home.dart';
 import 'features/weight/weight_screen.dart';
 import 'features/workout/workout_screen.dart';
@@ -79,6 +81,7 @@ class _Root extends StatelessWidget {
         '/bioimpedance': (_) => const ImportBioimpedanceScreen(),
         '/diet': (_) => const DietScreen(),
         '/training': (_) => const TrainingHomeScreen(),
+        '/settings': (_) => const SettingsScreen(),
       },
       home: const _Gate(),
     );
@@ -100,6 +103,9 @@ class _Gate extends StatelessWidget {
       );
     }
     if (!state.hasProfile) {
+      if (!state.onboardingIntroSeen) {
+        return const OnboardingIntroScreen();
+      }
       if (state.bioimpedances.isEmpty) {
         return const BioOnboardingScreen();
       }

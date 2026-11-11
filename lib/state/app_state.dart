@@ -61,6 +61,8 @@ class AppState extends ChangeNotifier {
   List<String> _favoriteIds = [];
   List<Food> _customFoods = [];
   String? _userEmail;
+  bool _onboardingIntroSeen = false;
+  Set<String> _seenTips = {};
 
   List<DietPlan> _dietPlans = [];
   String? _activeDietId;
@@ -121,6 +123,12 @@ class AppState extends ChangeNotifier {
   List<Food> get customFoods => List.unmodifiable(_customFoods);
   bool get hasProfile => _profile != null;
 
+  /// Introdução inicial já vista (persistida no dispositivo).
+  bool get onboardingIntroSeen => _onboardingIntroSeen;
+
+  /// Dica contextual já concluída — não deve ser repetida.
+  bool hasSeenTip(String id) => _seenTips.contains(id);
+
   // ── Dieta ──
   List<DietPlan> get dietPlans => List.unmodifiable(_dietPlans);
   DietPlan? get activeDiet {
@@ -179,6 +187,8 @@ class AppState extends ChangeNotifier {
     _favoriteIds = _store.favoriteIds;
     _customFoods = (_store.customFoods).map(Food.fromJson).toList();
     _userEmail = _store.userEmail;
+    _onboardingIntroSeen = _store.onboardingIntroSeen;
+    _seenTips = _store.seenTips.toSet();
     _dietPlans = (_store.dietPlans).map(DietPlan.fromJson).toList();
     _activeDietId = _store.activeDietId;
     if (_dietPlans.isNotEmpty && _activeDietId == null) {
@@ -639,6 +649,30 @@ class AppState extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Onboarding ──
+
+  /// Marca a introdução como concluída (pular também conta).
+  Future<void> completeOnboardingIntro() async {
+    if (_onboardingIntroSeen) return;
+    _onboardingIntroSeen = true;
+    await _store.setOnboardingIntroSeen(true);
+    notifyListeners();
+  }
+
+  /// Marca uma dica contextual como concluída — não repete.
+  Future<void> markTipSeen(String id) async {
+    if (!_seenTips.add(id)) return;
+    await _store.setSeenTips(_seenTips.toList());
+    notifyListeners();
+  }
+
+  /// Permite rever a introdução e as dicas quando o usuário quiser.
+  Future<void> resetOnboardingHints() async {
+    _seenTips = {};
+    await _store.setSeenTips(const []);
+    notifyListeners();
+  }
+
   /// Atualiza a foto de perfil (base64). Passar null para remover.
   Future<void> updateProfilePhoto(String? base64) async {
     final current = _profile;
@@ -939,6 +973,30 @@ class AppState extends ChangeNotifier {
       for (var i = n - 1; i >= 0; i--)
         summaryFor(now.subtract(Duration(days: i))),
     ];
+  }
+
+  /// Pesagens dos últimos [days] dias, da mais antiga para a mais recente.
+  /// Usada na evolução — nunca inventa pontos quando não há registros.
+  List<WeightRecord> weightsInLastDays(int days) {
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: days - 1));
+    final list = _weights
+        .where((w) => !w.date.isBefore(start) && !w.date.isAfter(now))
+        .toList()
+      ..sort((a, b) => a.date.compareTo(b.date));
+    return list;
+  }
+
+  /// Se já existe treino concluído na data (opcionalmente de um dia da ficha).
+  bool trainingCompletedOn(DateTime date, {String? dayId}) {
+    final d = DateTime(date.year, date.month, date.day);
+    return _trainingSessions.any((s) =>
+        s.status == TrainingStatus.completed &&
+        s.date.year == d.year &&
+        s.date.month == d.month &&
+        s.date.day == d.day &&
+        (dayId == null || s.dayId == dayId));
   }
 
   /// Semana corrente (segunda a domingo).

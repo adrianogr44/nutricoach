@@ -114,6 +114,12 @@ class _Header extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     const Text('NutriCoach', style: TextStyle(color: AppTheme.textPrimary, fontWeight: FontWeight.w800, fontSize: 17, letterSpacing: -0.5)),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                      decoration: BoxDecoration(color: AppTheme.primarySubtle, borderRadius: BorderRadius.circular(5)),
+                      child: const Text('IA', style: TextStyle(color: AppTheme.primary, fontWeight: FontWeight.w800, fontSize: 9, letterSpacing: 0.2)),
+                    ),
                   ],
                 ),
                 if (isDesktop) ...[
@@ -197,10 +203,17 @@ class _AvatarButton extends StatelessWidget {
     } else {
       content = _initialAvatar(name, radius);
     }
-    return InkWell(
-      onTap: () => Navigator.pushNamed(context, '/goals'),
-      customBorder: const CircleBorder(),
-      child: content,
+    return Tooltip(
+      message: 'Perfil e ajustes',
+      child: Semantics(
+        button: true,
+        label: 'Perfil e ajustes',
+        child: InkWell(
+          onTap: () => Navigator.pushNamed(context, '/settings'),
+          customBorder: const CircleBorder(),
+          child: content,
+        ),
+      ),
     );
   }
 
@@ -231,7 +244,7 @@ class _BottomNav extends StatelessWidget {
         child: NavigationBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          height: 62,
+          height: 66,
           selectedIndex: currentIndex,
           onDestinationSelected: onTap,
           destinations: const [

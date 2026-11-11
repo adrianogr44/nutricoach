@@ -11,6 +11,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/training.dart';
 import '../../services/training_transfer.dart';
 import '../../state/app_state.dart';
+import '../../widgets/app_components.dart';
 import 'active_training_screen.dart';
 import 'training_editor.dart';
 import 'training_history_view.dart';
@@ -117,6 +118,17 @@ class _TrainingHomeScreenState extends State<TrainingHomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (active == null && closedTodaySession == null) ...[
+          const ContextualTip(
+            tipId: 'training-start',
+            title: 'Um exercício por vez',
+            message:
+                'Ao iniciar, o app mostra o exercício atual com vídeo, carga e '
+                'séries. O descanso começa sozinho depois de concluir cada série.',
+            icon: Icons.fitness_center,
+          ),
+          const SizedBox(height: 14),
+        ],
         if (active != null && active.dayId != day.id) ...[
           _ActiveBanner(session: active, plan: plan),
           const SizedBox(height: 14),

@@ -34,6 +34,8 @@ class LocalStore {
   static const _kHealthSyncHistory = 'health_sync_history';
   static const _kHealthRestingHr = 'health_resting_hr';
   static const _kHealthWeight = 'health_weight';
+  static const _kOnboardingIntroSeen = 'onboarding_intro_seen';
+  static const _kSeenTips = 'seen_tips';
 
   static Future<LocalStore> open() async {
     final prefs = await SharedPreferences.getInstance();
@@ -165,4 +167,19 @@ class LocalStore {
   String? get userEmail => _prefs.getString(_kUserEmail);
   Future<void> setUserEmail(String? value) =>
       value == null ? _prefs.remove(_kUserEmail) : _prefs.setString(_kUserEmail, value);
+
+  // ── Onboarding e dicas contextuais ──
+  bool get onboardingIntroSeen => _prefs.getBool(_kOnboardingIntroSeen) ?? false;
+  Future<void> setOnboardingIntroSeen(bool value) =>
+      _prefs.setBool(_kOnboardingIntroSeen, value);
+
+  List<String> get seenTips {
+    final raw = _prefs.getString(_kSeenTips);
+    if (raw == null) return [];
+    final decoded = jsonDecode(raw);
+    return decoded is List ? decoded.whereType<String>().toList() : [];
+  }
+
+  Future<void> setSeenTips(List<String> value) =>
+      _prefs.setString(_kSeenTips, jsonEncode(value));
 }

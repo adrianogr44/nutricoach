@@ -9,6 +9,7 @@ import '../../core/theme/app_theme.dart';
 import '../../data/models/diet.dart';
 import '../../services/diet_transfer.dart';
 import '../../state/app_state.dart';
+import '../../widgets/app_components.dart';
 import '../../widgets/core_widgets.dart';
 
 import 'diet_meal_daily_card.dart';
@@ -447,6 +448,17 @@ class _DietDailyListState extends State<_DietDailyList> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          if (done == 0) ...[
+            const ContextualTip(
+              tipId: 'diet-swipe',
+              title: 'Concluir é um deslize',
+              message:
+                  'Deslize o cartão da refeição para a direita quando comer o que '
+                  'está no plano. Se comeu diferente, conclua e use "Ajustar".',
+              icon: Icons.swipe_right_alt,
+            ),
+            const SizedBox(height: 16),
+          ],
           Text(diet.name, style: const TextStyle(fontSize: 13, color: AppTheme.textSecondary)),
           const SizedBox(height: 6),
           const Text('Dieta de hoje', style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
@@ -480,22 +492,34 @@ class _DietDailyListState extends State<_DietDailyList> {
               onEdit: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DietMealEditor(diet: diet, existing: meal))),
               onDelete: () => context.read<AppState>().removeDietMeal(diet.id, meal.id),
             ),
-          const SizedBox(height: 6),
-          const Divider(height: 1, color: AppTheme.border),
-          const SizedBox(height: 18),
-          const Text('Plano', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w800, color: AppTheme.textMuted)),
           const SizedBox(height: 8),
-          Text('${totals['kcal']!.round()} kcal planejadas', style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppTheme.textPrimary)),
-          const SizedBox(height: 10),
-          Wrap(
-            spacing: 12,
-            children: [
-              _macroChip('P ${totals['protein']!.round()}g', AppTheme.macroProtein),
-              _macroChip('C ${totals['carbs']!.round()}g', AppTheme.macroCarbs),
-              _macroChip('G ${totals['fat']!.round()}g', AppTheme.macroFat),
-            ],
+          Container(
+            decoration: AppTheme.cardDecoration(),
+            child: AppExpandableSection(
+              key: const Key('diet-plan-details'),
+              icon: Icons.receipt_long_outlined,
+              title: 'Detalhes do plano',
+              subtitle: '${totals['kcal']!.round()} kcal planejadas',
+              children: [
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 8,
+                  children: [
+                    _macroChip('P ${totals['protein']!.round()}g', AppTheme.macroProtein),
+                    _macroChip('C ${totals['carbs']!.round()}g', AppTheme.macroCarbs),
+                    _macroChip('G ${totals['fat']!.round()}g', AppTheme.macroFat),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                const Text(
+                  'Valores calculados a partir dos alimentos do plano. O que você '
+                  'registra no dia pode variar conforme as porções.',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 12.5, height: 1.45),
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () => _addMeal(context, diet),
             icon: const Icon(Icons.add),

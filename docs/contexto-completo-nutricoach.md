@@ -70,9 +70,9 @@ lib/
 **`lib/app.dart`**
 
 - `NutriCoachApp` → `FutureBuilder<LocalStore>`; depois cria `ChangeNotifierProvider(create: AppState(store)..init())`.
-- `_Gate`: `!initialized` → spinner; `!hasProfile` → `BioOnboardingScreen` (se não há bioimpedância) ou `GoalsScreen`; senão `HomeShell`.
+- `_Gate`: `!initialized` → spinner; `!hasProfile` → `OnboardingIntroScreen` (primeiro acesso), depois `BioOnboardingScreen` (se não há bioimpedância) ou `GoalsScreen`; senão `HomeShell`. Pular a introdução também a marca como vista.
 
-**Rotas nomeadas** (10):
+**Rotas nomeadas** (12):
 
 | Rota | Tela |
 |---|---|
@@ -87,14 +87,16 @@ lib/
 | `/health` | `HealthScreen` |
 | `/diet` | `DietScreen` |
 | `/training` | `TrainingHomeScreen` |
+| `/settings` | `SettingsScreen` (perfil e ajustes) |
+| `/history` | `HistoryScreen` (também é a aba 3) |
 
 O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto com `/health` (tela de saúde do dispositivo). Também referenciado por insights e ações rápidas: `Navigator.pushNamed(context, '/history')` funciona e a aba 3 do shell continua abrindo a mesma tela.
 
 **`lib/shell/home_shell.dart` — HomeShell**
 
 - Abas (`IndexedStack`, índices 0–4): **Hoje** (`DashboardScreen`), **Dieta** (`DietScreen`), **Treino** (`TrainingHomeScreen`), **Histórico** (`HistoryScreen`), **Coach** (`CoachScreen`).
-- Desktop (`width ≥ 900`): sem bottom bar e **sem FAB**; header com tabs + botão `FilledButton` **"Registrar"** + avatar (avatar → `/goals`).
-- Mobile: `NavigationBar` (altura 62) + FAB "+" (`FloatingActionButtonLocation.endFloat`, acima da barra — nunca cobre a aba Treino) + atalho `Icons.restaurant_menu` → `/diet`.
+- Desktop (`width ≥ 900`): sem bottom bar e **sem FAB**; header com tabs + botão `FilledButton` **"Registrar"** + avatar (avatar → `/settings`).
+- Mobile: `NavigationBar` (altura 66) + FAB "+" (`FloatingActionButtonLocation.endFloat`, acima da barra — nunca cobre a aba Treino) + atalho `Icons.restaurant_menu` → `/diet` + avatar → `/settings` (com rótulo acessível "Perfil e ajustes").
 - **Bottom sheet "Registrar"** (`_AddSheet`, `showModalBottomSheet(isScrollControlled: true)`), 6 ações:
   `Minha Dieta → /diet` · `Adicionar refeição → /add-meal` · `Academia → /workout` · `Peso → /weight` · `Água → state.addWater(250ml)` · `Medidas → /measurements`.
 
@@ -104,27 +106,29 @@ O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto co
 
 | Tela | Arquivo | O que o usuário faz |
 |---|---|---|
-| **Hoje (dashboard)** | `features/dashboard/dashboard_screen.dart` | Hero de kcal animado, insight inline, macros, água, stats secundários (academia/peso/IMC), gráfico 7 dias (`LineChart` + linha de meta tracejada), timeline de dieta do dia com botão "Registrar"/"Editar", timeline de treino com "Iniciar treino →", "Extras do dia", pull-to-refresh |
+| **Hoje (dashboard)** | `features/dashboard/dashboard_screen.dart` | Hero de kcal animado, **próxima ação recomendada** (refeição/água/treino/proteína/evolução, com ação real), dica contextual de primeiro uso, insight inline, macros, água, stats secundários em um único card, análise de 7 dias recolhida (nível avançado), timeline de dieta do dia, timeline de treino e "Extras do dia", pull-to-refresh |
 | **Adicionar refeição** | `features/meals/add_meal_screen.dart` | 5 caminhos: descrever em texto, montar manualmente, pesquisar alimento, foto da tabela nutricional (OCR), favoritos |
 | **Texto livre** | `features/meals/meal_text_entry.dart` | digita "200g arroz, 100g frango" → `MealTextParser` → item sem match abre `FoodSearchScreen` como seletor |
 | **Manual** | `features/meals/manual_meal_screen.dart` | `FoodSearchScreen(compactPicker)` + conversão de medida caseira |
 | **Pesquisa** | `features/meals/food_search_screen.dart` | busca local + seção OpenFoodFacts |
 | **Código de barras** | `features/meals/barcode_screen.dart` | `FoodDatabase.byBarcode` → fallback `OpenFoodFactsApi` |
 | **OCR rótulo** | `features/meals/nutrition_label_screen.dart` | `DeviceTextRecognizer` → `NutritionLabelTextParser` → revisão humana → salvar |
-| **Dieta** | `features/diet/diet_screen.dart` + `diet_meal_editor.dart` | cria planos, refeições, itens (unidade caseira→gramas), totais, status do dia |
+| **Dieta** | `features/diet/diet_screen.dart` + `diet_meal_editor.dart` | cria planos, refeições, itens (unidade caseira→gramas), totais, status do dia; dica de deslize no primeiro uso e "Detalhes do plano" recolhido |
 | **Treino** | `features/training/{training_home,active_training_screen,exercise_video,training_widgets,training_stats,training_history_view,training_editor}.dart` | abas internas Hoje/Ficha/Histórico; destaque do dia com letra, ênfase, volume, progresso e CTA única; chips de divisão; lista de exercícios compacta e expansível; execução focada em 1 exercício (vídeo 16:9 ou placeholder, orientações, tabela de séries editável, botão grande "Concluir série", descanso com cronômetro único, navegação entre exercícios e finalização com resumo) |
 | **Academia manual** | `features/workout/workout_screen.dart` | kcal + tempo + obs → `addWorkout` |
 | **Peso / Medidas** | `weight_screen.dart`, `measurements_screen.dart` | `WeightRecord` (upsert por dia), `BodyMeasurement` |
 | **Metas** | `features/metas/metas_screen.dart` | TMB/TDEE/IMC/metas e edição do perfil |
-| **Histórico** | `features/history/history_screen.dart` | grade mensal com emoji do dia (🟢🟡🔴), detalhe do dia (macros + fibras 30 g + sódio 2000 mg + extras), resumo semanal com ações navegáveis |
-| **Coach** | `features/coach/coach_screen.dart` | "Foco de hoje" (insight principal), insights diários/semanais ordenados por prioridade, "Ações rápidas" (6 chips), rodapé "Sem IA generativa" |
+| **Histórico / Evolução** | `features/history/history_screen.dart` | evolução do peso dos últimos 90 dias (gráfico explicado, vazio orientativo, sem conclusões com poucos dados), medidas recentes, grade mensal com emoji do dia (🟢🟡🔴), detalhe do dia (macros + fibras + sódio + extras), resumo semanal com ações navegáveis |
+| **Coach** | `features/coach/coach_screen.dart` | "Foco de hoje" (insight principal), insights diários/semanais ordenados por prioridade, **perguntas rápidas com respostas calculadas dos dados reais**, "Ações rápidas" (6 chips), dica contextual e rodapé "Sem IA generativa" |
 | **Banco de alimentos** | `features/food_db/food_db_screen.dart` | busca, filtro por categoria, detalhe, favoritos |
 | **Bioimpedância** | `features/bioimpedance/import_bioimpedance_screen.dart` | câmera/galeria/texto/PDF/JSON → parser extensível → revisão editável (geral + segmentar) → salvar |
 | **JSON de bio** | `features/bioimpedance/bioimpedance_json_dialog.dart` | diálogo "Preencher com JSON": colar da área de transferência, exemplo, erro amigável; usado na importação e no onboarding |
 | **Revisão de bio** | `features/bioimpedance/bioimpedance_review.dart` | widget compartilhado: todos os campos editáveis, "não identificado", avisos e texto não reconhecido preservado |
 | **Saúde** | `features/health/health_screen.dart` | conectar Health Connect/Apple Health, sincronizar passos/sono/FC/treinos/peso, aplicar peso ao histórico |
+| **Onboarding inicial** | `features/onboarding/onboarding_intro_screen.dart` | 4 passos curtos com pular/continuar, explicação das áreas e da navegação; marca como visto no dispositivo e pode ser revisto em ajustes |
 | **Onboarding bio** | `features/onboarding/bio_onboarding_screen.dart` | mesma UI da importação + "Preencher manualmente" |
 | **Onboarding metas** | `features/onboarding/goals_screen.dart` | sexo/objetivo/atividade + preview ao vivo de TMB/TDEE/meta/proteína/água |
+| **Perfil e ajustes** | `features/settings/settings_screen.dart` | perfil, IMC/peso/meta, corpo, alimentação, treino, integrações, rever introdução/dicas, sobre e privacidade — só opções com função real |
 | **Check-in / Login** | `checkin/checkin_screen.dart`, `auth/login_screen.dart` | **órfãos** — não estão ligados a rota nem aba hoje |
 
 ---
@@ -217,35 +221,39 @@ O `/history` está registrado em `MaterialApp.routes` (`lib/app.dart`), junto co
 
 ## 11. Persistência e nuvem
 
-**`data/repositories/local_store.dart`** — SharedPreferences, JSON por chave: `profile`, `meals`, `workouts`, `weights`, `measurements`, `photos`, `water`, `favorites`, `custom_foods`, `user_email`, `bioimpedances`, `diet_plans`, `active_diet_id`, `training_plans`, `active_training_plan_id`, `training_sessions`, `health_config`, `health_steps`, `health_workouts`, `health_sleep`, `health_heartrate`, `health_sync_history`, `health_resting_hr`, `health_weight`. Toda mutação chama `_persist*`.
+**`data/repositories/local_store.dart`** — SharedPreferences, JSON por chave: `profile`, `meals`, `workouts`, `weights`, `measurements`, `photos`, `water`, `favorites`, `custom_foods`, `user_email`, `bioimpedances`, `diet_plans`, `active_diet_id`, `training_plans`, `active_training_plan_id`, `training_sessions`, `health_config`, `health_steps`, `health_workouts`, `health_sleep`, `health_heartrate`, `health_sync_history`, `health_resting_hr`, `health_weight`, `onboarding_intro_seen`, `seen_tips`. Toda mutação chama `_persist*`.
 
 **`data/repositories/cloud_sync.dart`** — espelho Firestore (`users/{uid}/…`): `initialize()`, `syncMeal`, `deleteMeal`, `syncUser`, `syncWorkout`, `syncWeight`; `_userId => null` ⇒ tudo no-op hoje. `config/secrets.dart` tem strings vazias (sem credencial commitada).
 
 ---
 
-## 12. Design system (`core/theme/app_theme.dart` + `widgets/core_widgets.dart`)
+## 12. Design system (`core/theme/app_theme.dart` + `widgets/app_components.dart`)
 
-Tema **escuro único** `AppTheme.dark()`:
+Tema **escuro único** `AppTheme.dark()` — identidade **Dark Premium**:
 
 | Papel | Hex |
 |---|---|
-| background | `0xFF070A0F` (subtle `0xFF0A0F14`, elevated `0xFF0F141B`) |
-| surface | `0xFF121821` (light `0xFF1A2330`, hover `0xFF1E2A3A`, pressed `0xFF243247`) |
-| border | `0xFF1E2A38` (strong `0xFF243247`) |
-| textPrimary / Secondary / Muted / Faint | `0xFFF1F5F9` / `0xFF8DA0B8` / `0xFF5F7288` / `0xFF3D4E62` |
-| textOnPrimary | `0xFF06251A` |
-| primary (verde) | `0xFF00E6A0` (soft `0xFF00B87A`, muted `0xFF0A2E22`) |
-| accent (azul) | `0xFF3B82F6` |
-| warning / danger | `0xFFF59E0B` / `0xFFEF4444` |
-| macroProtein / macroCarbs / macroFat / macroWater | `0xFFA78BFA` / `0xFFFBBF24` / `0xFF60A5FA` / `0xFF22D3EE` |
+| background (preto carvão) | `0xFF101014` (subtle `0xFF0B0B0E`, elevated `0xFF17171C`) |
+| surface (grafite) | `0xFF202027` (light `0xFF282830`, hover `0xFF30303A`, pressed `0xFF383844`, sunken `0xFF16161B`) |
+| border | `0xFF30303A` (strong `0xFF3C3C48`; subtle branco 8%) |
+| textPrimary / Secondary / Muted / Faint | `0xFFFFFFFF` / `0xFF8A8793` / `0xFF77747F` / `0xFF55525C` |
+| textOnPrimary | `0xFF101014` (texto escuro sobre o verde cítrico) |
+| primary (verde cítrico) | `0xFFC5FF5A` (soft `0xFFA9E63F`, muted `0xFF232B14`, subtle 12%) |
+| accent (informação) | `0xFF8FA8FF` |
+| success / warning / danger | `0xFF7BE0A8` / `0xFFFFC857` / `0xFFFF6B6B` |
+| macroProtein / macroCarbs / macroFat / macroWater | `0xFFC0A6FF` / `0xFFFFC857` / `0xFF7FB0FF` / `0xFF6FD9EA` |
 
-Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (títulos/UI) e **JetBrains Mono** (números, check-in). Componentes reutilizáveis: `GlassCard`, `SectionHeader`, `GradientBar`, `StatusBadge`, `MetricCard`, `ProgressRing`.
+Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (números/títulos display), **Inter** (texto/UI) e **JetBrains Mono** (rótulos técnicos). Botões primários usam verde cítrico com `textOnPrimary`; nunca verde como fundo dominante. Componentes reutilizáveis: `AppCard`, `AppSectionHeader`, `AppBadge`, `AppEmptyState`, `AppInfoNote`, `AppListTile`, `AppProgressLine`, `AppExpandableSection`, `ContextualTip`, `AppStepDots` (+ legados `GlassCard`, `SectionHeader`, `GradientBar`, `StatusBadge`, `MetricCard`, `ProgressRing`).
+
+**Complexidade progressiva**: o essencial fica visível; detalhes (gráfico de 7 dias, detalhes do plano, FAQ do Coach) usam `AppExpandableSection`; nada é removido, apenas revelado sob demanda.
+
+**Onboarding e dicas**: `OnboardingIntroScreen` (4 passos, pulável) precede o onboarding de bio no primeiro acesso. `AppState.completeOnboardingIntro()` e `AppState.markTipSeen(id)` persistem em `onboarding_intro_seen` e `seen_tips`; `resetOnboardingHints()` permite rever. As dicas contextuais (`ContextualTip`) aparecem só uma vez por área e nunca bloqueiam o uso.
 
 ---
 
 ## 13. Fluxos críticos
 
-1. **Onboarding**: gate → `BioOnboardingScreen` (câmera/galeria/texto/PDF → OCR → parser) → revisão → `importBioimpedance` (peso + metas com TMB medida) → `GoalsScreen` → `computeGoals` + `saveProfile` + `addWeight` → `HomeShell`. Sem bio, vai direto ao `GoalsScreen`.
+1. **Onboarding**: gate → `OnboardingIntroScreen` (4 passos, pulável, marca `onboarding_intro_seen`) → `BioOnboardingScreen` (câmera/galeria/texto/PDF → OCR → parser) → revisão → `importBioimpedance` (peso + metas com TMB medida) → `GoalsScreen` → `computeGoals` + `saveProfile` + `addWeight` → `HomeShell`. Sem bio, vai direto ao `GoalsScreen`. A introdução e as dicas podem ser revistas em Perfil e ajustes.
 2. **Refeição por texto**: `AddMealScreen` → `MealTextEntryScreen` → `mealParser.parse` → resolve cada item no banco/OFF (ou abre `FoodSearchScreen`) → `buildMeal` → `addMeal` → persiste → `DailySummary` recalcula.
 3. **Rótulo OCR**: `NutritionLabelScreen` → ML Kit → `NutritionLabelTextParser` → `toFood` → revisão → salvar.
 4. **Código de barras**: `BarcodeScreen` → `FoodDatabase.byBarcode` → fallback `OpenFoodFactsApi`.
@@ -277,11 +285,20 @@ Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (títulos/U
 
 **Dados**: `TrainingPlan/TrainingDay/ExerciseDef` e `TrainingSession/ExerciseSession/TrainingSet` preservados. `AppState.replaceSetInSession` corrige uma série antes de finalizar. `TrainingStats` calcula progresso por exercício/série (`sessionProgress`, `setsProgress`), ênfase (`TrainingDay.emphasis`) e volume.
 
+### 13.2 Redesign global — Dark Premium
+
+- **Início**: hero de calorias + **próxima ação** calculada do estado real (primeira refeição, continuar treino, treino do dia, água com +250 ml, proteína, evolução). O gráfico de 7 dias virou análise recolhida; os stats secundários foram agrupados em um único card. Dica contextual `dashboard-overview`.
+- **Dieta**: dica de deslize só no primeiro uso com 0 refeições concluídas; "Detalhes do plano" (kcal e macros planejados) em seção expansível. Swipe/conclusão/ajuste preservados.
+- **Evolução/Histórico**: gráfico de peso dos últimos 90 dias com pesagens reais, variação do período, explicação e estado vazio orientativo (sem conclusão com menos de 2 registros); medidas recentes acima do calendário. Dica `history-evolution`.
+- **Coach**: mantém o motor determinístico de insights, adiciona "Perguntas rápidas" com respostas calculadas (calorias restantes, proteína, treino de hoje e metodologia) e deixa explícito que não há IA generativa. Dica `coach-insights`.
+- **Perfil e ajustes** (`/settings`): perfil + IMC/peso/meta, corpo, alimentação, treino, integrações (saúde e armazenamento), rever introdução/dicas e sobre/privacidade. Acessível pelo avatar no header, com rótulo acessível.
+- **Feedbacks**: snackbars e diálogos padronizados pelo tema; estados vazios sempre com ação; ícones acompanham texto (não dependem só de cor).
+
 ---
 
 ## 14. Testes, qualidade e deploy
 
-- **Testes** (`test/`, 26 arquivos, 316 casos passando): banco TACO/cálculos/`DailySummary.status`, `MealTextParser`, `InsightRulesEngine`, `HouseholdMeasureConverter`/`DietPlan`, parser de bioimpedância (aliases, números, segmentar, histórico × atual, faixas de referência, data, modelo/JSON, entrada por JSON e diálogo), revisão editável, integração com a saúde (serviço falso), parsers de rótulo/OFF, `FoodDataUpdater`, copy das telas ("sem chat", "Sem IA generativa"), área de treino (home/execução, descanso, edição de série, overflow 360/390 px, vídeo no modelo e no arquivo exportado) e regressões de UI (`dashboard_hoje_regression_test`, `home_shell_fab_test`).
+- **Testes** (`test/`, 30 arquivos, 328 casos passando): banco TACO/cálculos/`DailySummary.status`, `MealTextParser`, `InsightRulesEngine`, `HouseholdMeasureConverter`/`DietPlan`, parser de bioimpedância (aliases, números, segmentar, histórico × atual, faixas de referência, data, modelo/JSON, entrada por JSON e diálogo), revisão editável, integração com a saúde (serviço falso), parsers de rótulo/OFF, `FoodDataUpdater`, copy das telas ("sem chat", "Sem IA generativa"), área de treino (home/execução, descanso, edição de série, overflow 360/390 px, vídeo no modelo e no arquivo exportado), design system (tokens oficiais + componentes), onboarding inicial (gate, pular, percorrer, persistência e revisão), perfil/ajustes e evolução do peso (com e sem dados) e regressões de UI (`dashboard_hoje_regression_test`, `home_shell_fab_test`).
 - **Qualidade**: `flutter analyze` (só infos/warnings pré-existentes) · `flutter test` determinístico (SharedPreferences mockado).
 - **Deploy site**: `flutter build web --release` → `npx vercel build --prod` → `npx vercel deploy --prebuilt --prod --yes`. Produção: `https://nutricoachai-wheat.vercel.app`. O push ao GitHub **não** dispara build na Vercel (`Ignored Build Step = exit 0`), de propósito — a Vercel não compila Flutter.
 - **Local**: `flutter run` / `flutter run -d chrome` / `serve.py` (porta 8080).
@@ -302,6 +319,10 @@ Raios: 8 / 12 / 16 / 20 / 28 / 999. Fontes Google: **Space Grotesk** (títulos/U
 - Treino: vídeos são links (`videoUrl`) abertos no app/browser — não há player embutido nem vídeos versionados no repositório. Sem URL, a área 16:9 mostra placeholder.
 - Treino: o app não cria uma segunda sessão ativa; para trocar de treino é preciso finalizar o atual (o banner permite continuar o que está em andamento).
 - Sem CI/CD (`.github/` inexistente).
+- Coach: não há chat com IA generativa. As respostas das "Perguntas rápidas" são calculadas localmente a partir dos registros; não há LLM nem envio de dados para gerar texto.
+- Onboarding inicial e dicas: `onboarding_intro_seen` e `seen_tips` ficam só no dispositivo (não sincronizam com a nuvem, como o restante no modo offline).
+- Evolução: a tendência usa apenas pesagens registradas (manual, dispositivo ou bioimpedância). Não há gráfico de gordura corporal/segmentar ao longo do tempo.
+- Integrações em Perfil e ajustes mostram o estado real (offline/nuvem e saúde conectada), mas não incluem novos toggles além do que existe em `/health`.
 
 ---
 

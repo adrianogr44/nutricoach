@@ -1,13 +1,16 @@
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/constants.dart';
 import '../../core/theme/app_theme.dart';
 import '../../core/utils/formatters.dart';
+import '../../data/models/body_track.dart';
 import '../../data/models/daily_summary.dart';
 import '../../data/models/meal.dart';
 import '../../services/insight_rules_engine.dart';
 import '../../state/app_state.dart';
+import '../../widgets/app_components.dart';
 import '../../widgets/core_widgets.dart';
 
 /// Histórico em calendário: cada dia tem status 🟢/🟡/🔴.
@@ -44,7 +47,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Histórico', style: TextStyle(fontSize: 18)),
+        title: const Text('Evolução e histórico', style: TextStyle(fontSize: 18)),
         actions: [
           TextButton(
             onPressed: () => setState(() {
@@ -58,6 +61,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
         children: [
+          const ContextualTip(
+            tipId: 'history-evolution',
+            title: 'Dados viram direção',
+            message:
+                'A evolução do peso usa apenas as pesagens que você registrou. '
+                'No calendário, abra qualquer dia para rever refeições, treino e '
+                'orientações.',
+            icon: Icons.trending_up,
+          ),
+          const SizedBox(height: 16),
+          const AppSectionHeader(
+            title: 'Evolução do peso',
+            subtitle: 'Tendência dos últimos 90 dias, com base nas suas pesagens.',
+            icon: Icons.monitor_weight_outlined,
+          ),
+          const SizedBox(height: 12),
+          const _WeightEvolutionCard(),
+          const SizedBox(height: 20),
+          const _MeasurementsSummary(),
+          const SizedBox(height: 24),
           _MonthHeader(
             month: _month,
             onPrev: _prevMonth,
@@ -71,9 +94,316 @@ class _HistoryScreenState extends State<HistoryScreen> {
             state: state,
           ),
           const SizedBox(height: 24),
-          const SectionHeader(title: '📋 Detalhe do dia'),
+          const AppSectionHeader(
+            title: 'Detalhe do dia',
+            subtitle: 'Refeições, macros, água, peso e treino registrados.',
+            icon: Icons.event_note_outlined,
+          ),
           const SizedBox(height: 12),
           DayDetailCard(summary: state.summaryFor(selected)),
+        ],
+      ),
+    );
+  }
+}
+
+class _WeightEvolutionCard extends StatelessWidget {
+  const _WeightEvolutionCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final weights = state.weightsInLastDays(90);
+
+    if (weights.length < 2) {
+      return AppCard(
+        child: AppEmptyState(
+          icon: Icons.monitor_weight_outlined,
+          title: 'Ainda não há tendência',
+          message:
+              'Registre seu peso pelo menos duas vezes para ver a direção ao '
+              'longo do tempo. Um registro isolado não mostra evolução.',
+          action: SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: () => Navigator.pushNamed(context, '/weight'),
+              icon: const Icon(Icons.add, size: 18),
+              label: const Text('Registrar peso'),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final values = [for (final w in weights) w.weightKg];
+    var minV = values.first;
+    var maxV = values.first;
+    for (final v in values) {
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+    final range = maxV - minV;
+    final padding = range < 1 ? 1.0 : range * 0.2;
+    final first = weights.first;
+    final last = weights.last;
+    final delta = last.weightKg - first.weightKg;
+    final stable = delta.abs() < 0.05;
+    final down = delta < 0;
+    final deltaLabel = stable
+        ? 'estável'
+        : '${down ? '−' : '+'}${delta.abs().toStringAsFixed(1).replaceAll('.', ',')} kg';
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'PESO MAIS RECENTE',
+                      style: TextStyle(
+                        color: AppTheme.textMuted,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.7,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '${last.weightKg.toStringAsFixed(1).replaceAll('.', ',')} kg',
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
+                        fontFeatures: [FontFeature.tabularFigures()],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '${weights.length} pesagens em 90 dias · variação no período',
+                      style: const TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 12.5,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              AppBadge(
+                label: deltaLabel,
+                color: stable ? AppTheme.textSecondary : AppTheme.primary,
+                icon: stable
+                    ? Icons.trending_flat
+                    : down
+                        ? Icons.trending_down
+                        : Icons.trending_up,
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            height: 130,
+            child: LineChart(
+              LineChartData(
+                minY: minV - padding,
+                maxY: maxV + padding,
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: range < 1 ? 1 : range / 2,
+                  getDrawingHorizontalLine: (_) =>
+                      const FlLine(color: AppTheme.border, strokeWidth: 0.8),
+                ),
+                titlesData: FlTitlesData(
+                  topTitles: const AxisTitles(),
+                  rightTitles: const AxisTitles(),
+                  leftTitles: const AxisTitles(),
+                  bottomTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      interval: 1,
+                      getTitlesWidget: (v, meta) {
+                        final i = v.toInt();
+                        if (i == 0) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              Formatters.shortDay(first.date),
+                              style: const TextStyle(
+                                color: AppTheme.textFaint,
+                                fontSize: 10,
+                              ),
+                            ),
+                          );
+                        }
+                        if (i == weights.length - 1) {
+                          return Padding(
+                            padding: const EdgeInsets.only(top: 6),
+                            child: Text(
+                              Formatters.shortDay(last.date),
+                              style: const TextStyle(
+                                color: AppTheme.textFaint,
+                                fontSize: 10,
+                              ),
+                            ),
+                          );
+                        }
+                        return const SizedBox.shrink();
+                      },
+                    ),
+                  ),
+                ),
+                borderData: FlBorderData(show: false),
+                lineTouchData: const LineTouchData(enabled: false),
+                lineBarsData: [
+                  LineChartBarData(
+                    spots: [
+                      for (var i = 0; i < weights.length; i++)
+                        FlSpot(i.toDouble(), weights[i].weightKg),
+                    ],
+                    isCurved: true,
+                    curveSmoothness: 0.25,
+                    color: AppTheme.primary,
+                    barWidth: 2.4,
+                    dotData: FlDotData(
+                      show: weights.length <= 20,
+                      getDotPainter: (spot, percent, bar, index) =>
+                          FlDotCirclePainter(
+                        radius: 3,
+                        color: AppTheme.primary,
+                        strokeWidth: 2,
+                        strokeColor: AppTheme.surface,
+                      ),
+                    ),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          AppTheme.primary.withValues(alpha: 0.16),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Text(
+            'Cada ponto é uma pesagem registrada. Hidratação e horário podem '
+            'mudar o número de um dia para outro — o que importa é a tendência.',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12.5,
+              height: 1.45,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MeasurementsSummary extends StatelessWidget {
+  const _MeasurementsSummary();
+
+  @override
+  Widget build(BuildContext context) {
+    final state = context.watch<AppState>();
+    final latest = <MeasureType, BodyMeasurement>{};
+    for (final m in state.measurements) {
+      final current = latest[m.type];
+      if (current == null || m.date.isAfter(current.date)) {
+        latest[m.type] = m;
+      }
+    }
+
+    if (latest.isEmpty) {
+      return AppCard(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+        child: AppListTile(
+          icon: Icons.straighten_outlined,
+          title: 'Medidas corporais',
+          subtitle: 'Registre circunferências para comparar ao longo do tempo.',
+          onTap: () => Navigator.pushNamed(context, '/measurements'),
+        ),
+      );
+    }
+
+    return AppCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'Medidas mais recentes',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pushNamed(context, '/measurements'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(0, 40),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                ),
+                child: const Text('Ver todas'),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final entry in latest.entries)
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 9,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceLight,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        entry.key.label,
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                        ),
+                      ),
+                      const SizedBox(height: 1),
+                      Text(
+                        '${entry.value.valueCm.toStringAsFixed(1).replaceAll('.', ',')} cm',
+                        style: const TextStyle(
+                          color: AppTheme.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
         ],
       ),
     );

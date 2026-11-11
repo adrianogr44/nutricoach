@@ -13,6 +13,7 @@ import '../../data/models/meal.dart';
 import '../../services/household_measure.dart';
 import '../../services/insight_rules_engine.dart';
 import '../../state/app_state.dart';
+import '../../widgets/app_components.dart';
 import '../diet/diet_meal_editor.dart';
 import '../meals/food_search_screen.dart';
 import '../training/active_training_screen.dart';
@@ -33,25 +34,44 @@ class DashboardScreen extends StatelessWidget {
       body: RefreshIndicator(
         color: AppTheme.primary,
         onRefresh: () async {},
-        child: ListView(
+        child: SingleChildScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.fromLTRB(20, 8, 20, 88),
-          children: [
-            _Greeting(name: profile?.name),
-            const SizedBox(height: 24),
-            _HeroCalories(summary: today),
-            const SizedBox(height: 20),
-            _InsightInline(today: today),
-            const SizedBox(height: 28),
-            _MacroStrip(today: today, metrics: m),
-            const SizedBox(height: 28),
-            _MealsToday(today: today),
-            const SizedBox(height: 28),
-            _WaterCompact(today: today, metrics: m),
-            const SizedBox(height: 28),
-            _SecondaryStats(summary: today),
-            const SizedBox(height: 24),
-            _CalorieChartMinimal(state: state),
-          ],
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _Greeting(name: profile?.name),
+              const SizedBox(height: 24),
+              _HeroCalories(summary: today),
+              const SizedBox(height: 16),
+              const ContextualTip(
+                tipId: 'dashboard-overview',
+                title: 'Seu dia em segundos',
+                message:
+                    'O número grande mostra as calorias consumidas hoje. Logo abaixo, '
+                    'o app sugere a próxima ação que mais ajuda no seu momento.',
+              ),
+              const SizedBox(height: 16),
+              _NextActionCard(state: state),
+              const SizedBox(height: 20),
+              _InsightInline(today: today),
+              const SizedBox(height: 28),
+              _MacroStrip(today: today, metrics: m),
+              const SizedBox(height: 28),
+              _MealsToday(today: today),
+              const SizedBox(height: 28),
+              _WaterCompact(today: today, metrics: m),
+              const SizedBox(height: 28),
+              const AppSectionHeader(
+                title: 'Seu corpo e dispositivos',
+                subtitle: 'Dados que complementam o resumo do dia.',
+              ),
+              const SizedBox(height: 10),
+              _SecondaryStats(summary: today),
+              const SizedBox(height: 20),
+              _CalorieAnalysis(state: state),
+            ],
+          ),
         ),
       ),
     );
@@ -223,6 +243,227 @@ class _HeroCaloriesState extends State<_HeroCalories> with SingleTickerProviderS
       ),
     );
   }
+}
+
+/// Próxima ação recomendada — uma única ação principal, baseada no momento
+/// real do usuário (sem dados fictícios).
+class _NextActionCard extends StatelessWidget {
+  const _NextActionCard({required this.state});
+
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    final action = _resolve(context);
+    return AppCard(
+      padding: const EdgeInsets.all(AppTheme.spaceMd),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: AppTheme.primarySubtle,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                ),
+                child: Icon(action.icon, color: AppTheme.primary, size: 20),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'PRÓXIMA AÇÃO',
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.9,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      action.title,
+                      style: const TextStyle(
+                        color: AppTheme.textPrimary,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            action.message,
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
+              height: 1.45,
+            ),
+          ),
+          const SizedBox(height: 14),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton.icon(
+              onPressed: action.onPressed,
+              icon: Icon(action.buttonIcon, size: 18),
+              label: Text(action.label),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  _NextAction _resolve(BuildContext context) {
+    final now = DateTime.now();
+    final today = state.today;
+    final meals = state.mealsOn(now);
+    final plan = state.activeTrainingPlan;
+    final trainingDay = plan?.today;
+    final activeSession = state.activeTrainingSession;
+    final water = today.waterMl;
+    final metaWater = today.metaWater;
+    final protein = today.protein;
+    final metaProtein = today.metaProtein;
+
+    void open(String route) => Navigator.pushNamed(context, route);
+
+    if (meals.isEmpty && now.hour < 15) {
+      return _NextAction(
+        icon: Icons.restaurant_outlined,
+        title: 'Registre sua primeira refeição',
+        message:
+            'Anote o que você comeu para o app calcular calorias, proteínas e o '
+            'quanto ainda cabe no seu dia.',
+        label: 'Registrar refeição',
+        buttonIcon: Icons.add,
+        onPressed: () => open('/add-meal'),
+      );
+    }
+
+    if (activeSession != null) {
+      return _NextAction(
+        icon: Icons.play_circle_outline,
+        title: 'Seu treino está em andamento',
+        message:
+            'Continue de onde parou. A série atual e o descanso continuam salvos.',
+        label: 'Continuar treino',
+        buttonIcon: Icons.play_arrow,
+        onPressed: () => open('/training'),
+      );
+    }
+
+    if (plan == null || plan.days.isEmpty) {
+      return _NextAction(
+        icon: Icons.fitness_center,
+        title: 'Monte sua ficha de treino',
+        message:
+            'Crie as divisões da semana ou importe uma ficha pronta para começar '
+            'a acompanhar séries e cargas.',
+        label: 'Abrir treino',
+        buttonIcon: Icons.arrow_forward,
+        onPressed: () => open('/training'),
+      );
+    }
+
+    final trainingPending =
+        trainingDay != null && !state.trainingCompletedOn(now, dayId: trainingDay.id);
+    if (trainingPending && now.hour >= 15) {
+      return _NextAction(
+        icon: Icons.fitness_center,
+        title: 'Treino de hoje: ${trainingDay.name}',
+        message:
+            '${trainingDay.totalExercises} exercícios · ${trainingDay.totalSets} séries. '
+            'Abra a execução focada quando estiver pronto.',
+        label: 'Ver treino de hoje',
+        buttonIcon: Icons.arrow_forward,
+        onPressed: () => open('/training'),
+      );
+    }
+
+    if (metaWater > 0 && water < metaWater * 0.6 && now.hour >= 11) {
+      final missing = (metaWater - water).clamp(0, metaWater).round();
+      return _NextAction(
+        icon: Icons.water_drop_outlined,
+        title: 'Hidrate-se ao longo do dia',
+        message:
+            'Você registrou ${water.round()} ml de ${metaWater.round()} ml. '
+            'Faltam aproximadamente $missing ml — um copo agora já ajuda.',
+        label: 'Adicionar 250 ml',
+        buttonIcon: Icons.add,
+        onPressed: () async {
+          await state.addWater(DateTime.now(), 250);
+          if (!context.mounted) return;
+          showAppSnack(context, 'Água registrada: +250 ml', icon: Icons.water_drop);
+        },
+      );
+    }
+
+    if (trainingPending) {
+      return _NextAction(
+        icon: Icons.fitness_center,
+        title: 'Treino de hoje: ${trainingDay.name}',
+        message:
+            '${trainingDay.totalExercises} exercícios · ${trainingDay.totalSets} séries. '
+            'Você pode treinar agora ou mais tarde.',
+        label: 'Ver treino de hoje',
+        buttonIcon: Icons.arrow_forward,
+        onPressed: () => open('/training'),
+      );
+    }
+
+    if (metaProtein > 0 && protein < metaProtein * 0.7 && now.hour >= 18) {
+      return _NextAction(
+        icon: Icons.restaurant_menu,
+        title: 'Proteína abaixo da meta',
+        message:
+            'Você consumiu ${protein.round()} g de ${metaProtein.round()} g. '
+            'Confira a dieta para ajustar a próxima refeição.',
+        label: 'Ver minha dieta',
+        buttonIcon: Icons.arrow_forward,
+        onPressed: () => open('/diet'),
+      );
+    }
+
+    return _NextAction(
+      icon: Icons.trending_up,
+      title: 'Dia em dia — veja sua evolução',
+      message:
+          'Seus registros de hoje estão completos. Acompanhe a tendência de peso '
+          'e as medidas ao longo do tempo.',
+      label: 'Ver evolução',
+      buttonIcon: Icons.arrow_forward,
+      onPressed: () => open('/history'),
+    );
+  }
+}
+
+class _NextAction {
+  const _NextAction({
+    required this.icon,
+    required this.title,
+    required this.message,
+    required this.label,
+    required this.buttonIcon,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String title;
+  final String message;
+  final String label;
+  final IconData buttonIcon;
+  final VoidCallback onPressed;
 }
 
 /// Insight — parte natural do produto, não alerta de sistema
@@ -399,23 +640,26 @@ class _SecondaryStats extends StatelessWidget {
     final weight = summary.weightKg ?? state.latestWeight?.weightKg ?? 0;
     final perdido = state.pesoPerdidoKg;
     final bio = state.bioimpedances.isNotEmpty ? state.bioimpedances.last : null;
-    return Column(
-      children: [
-        _StatRow(icon: Icons.fitness_center_outlined, label: 'Academia', value: burned > 0 ? '${burned.round()} kcal hoje' : 'Nenhum treino hoje', trailing: const Icon(Icons.chevron_right, size: 16, color: AppTheme.textMuted), onTap: () => Navigator.pushNamed(context, '/workout')),
-        const Divider(height: 1, color: AppTheme.border),
-        _StatRow(icon: Icons.monitor_weight_outlined, label: 'Peso', value: weight > 0 ? '${weight.toStringAsFixed(1)} kg${perdido > 0 ? "  ·  −${perdido.toStringAsFixed(1)} kg" : ""}' : 'Registrar peso', onTap: () => Navigator.pushNamed(context, '/weight')),
-        const Divider(height: 1, color: AppTheme.border),
-        _StatRow(icon: Icons.biotech_outlined, label: 'Bioimpedância', value: bio != null ? '${bio.pontuacao ?? "—"} pts · ${bio.tmbKcal?.round() ?? "—"} kcal' : 'Importar laudo InBody', onTap: () => Navigator.pushNamed(context, '/bioimpedance')),
-        const Divider(height: 1, color: AppTheme.border),
-        _StatRow(
-          icon: Icons.watch_outlined,
-          label: 'Saúde',
-          value: state.healthConfig.connected
-              ? (state.todaySteps != null ? '${state.todaySteps!.steps} passos hoje' : 'Conectado · sincronizar')
-              : 'Conectar relógio ou balança',
-          onTap: () => Navigator.pushNamed(context, '/health'),
-        ),
-      ],
+    return AppCard(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+      child: Column(
+        children: [
+          _StatRow(icon: Icons.fitness_center_outlined, label: 'Academia', value: burned > 0 ? '${burned.round()} kcal hoje' : 'Nenhum treino hoje', trailing: const Icon(Icons.chevron_right, size: 18, color: AppTheme.textMuted), onTap: () => Navigator.pushNamed(context, '/workout')),
+          const Divider(height: 1, color: AppTheme.divider),
+          _StatRow(icon: Icons.monitor_weight_outlined, label: 'Peso', value: weight > 0 ? '${weight.toStringAsFixed(1)} kg${perdido > 0 ? "  ·  −${perdido.toStringAsFixed(1)} kg" : ""}' : 'Registrar peso', onTap: () => Navigator.pushNamed(context, '/weight')),
+          const Divider(height: 1, color: AppTheme.divider),
+          _StatRow(icon: Icons.biotech_outlined, label: 'Bioimpedância', value: bio != null ? '${bio.pontuacao ?? "—"} pts · ${bio.tmbKcal?.round() ?? "—"} kcal' : 'Importar laudo InBody', onTap: () => Navigator.pushNamed(context, '/bioimpedance')),
+          const Divider(height: 1, color: AppTheme.divider),
+          _StatRow(
+            icon: Icons.watch_outlined,
+            label: 'Saúde',
+            value: state.healthConfig.connected
+                ? (state.todaySteps != null ? '${state.todaySteps!.steps} passos hoje' : 'Conectado · sincronizar')
+                : 'Conectar relógio ou balança',
+            onTap: () => Navigator.pushNamed(context, '/health'),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -449,6 +693,39 @@ class _StatRow extends StatelessWidget {
             if (trailing != null) trailing!,
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Nível avançado — o gráfico fica disponível, mas não domina a home.
+class _CalorieAnalysis extends StatelessWidget {
+  const _CalorieAnalysis({required this.state});
+  final AppState state;
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      padding: EdgeInsets.zero,
+      child: AppExpandableSection(
+        key: const Key('calorie-analysis'),
+        icon: Icons.insights_outlined,
+        title: 'Análise dos últimos 7 dias',
+        subtitle: 'Nível avançado · toque para abrir',
+        children: [
+          _CalorieChartMinimal(state: state),
+          const SizedBox(height: 12),
+          const Text(
+            'Cada ponto é o total de calorias registradas no dia e a linha '
+            'tracejada é a sua meta. Use como referência de padrão — não como '
+            'avaliação médica.',
+            style: TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12.5,
+              height: 1.45,
+            ),
+          ),
+        ],
       ),
     );
   }

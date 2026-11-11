@@ -170,7 +170,7 @@ class _MeasurementsScreenState extends State<MeasurementsScreen> {
                 icon: const Icon(Icons.add_a_photo, size: 18),
                 style: IconButton.styleFrom(
                   backgroundColor: AppTheme.primary,
-                  foregroundColor: const Color(0xFF06251A),
+                  foregroundColor: AppTheme.textOnPrimary,
                 ),
               ),
             ],
